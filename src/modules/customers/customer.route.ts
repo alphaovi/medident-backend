@@ -3,6 +3,8 @@ import { CustomerControllers } from "./customer.controller.js";
 
 const router = express.Router();
 
+// create customer route
+
 router.post(
   "/create-customer",
   CustomerControllers.createCustomer
