@@ -1,7 +1,13 @@
 import { Types } from "mongoose";
 
+export type PurchaseOrderStatus =
+  | "Ordered"
+  | "On Transit"
+  | "Received";
+
 export type PurchaseOrderItemStatus =
-  | "Pending"
+  | "Ordered"
+  | "On Transit"
   | "Received";
 
 export type PurchaseOrderItem = {
@@ -51,5 +57,5 @@ export type PurchaseOrder = {
 
   grandTotal: number;
 
-  status: "Pending" | "Partially Received" | "Received";
+  status: PurchaseOrderStatus;
 };

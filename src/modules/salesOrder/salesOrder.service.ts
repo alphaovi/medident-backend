@@ -1,427 +1,115 @@
 import mongoose from "mongoose";
-
 import { ProductModel } from "../product/product.model.js";
-import { ProductGroupModel } from "../productGroup/productGroup.model.js";
-import { ProductSubgroupModel } from "../productSubgroup/productSubgroup.model.js";
 import { CustomerModel } from "../customers/customer.model.js";
 import { SaleOrderModel } from "./salesOrder.model.js";
+import { InventoryModel } from "../inventory/inventory.model.js";
 
-type CreateSaleOrderPayload = {
-  stateOrRegion: string;
+const roundNumber = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
-  customer: string;
+const createSaleOrderIntoDB = async (payload: any) => {
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
 
-  orderDate: string | Date;
+    const customer = await CustomerModel.findOne({ id: payload.customer }).session(session);
+    if (!customer) throw new Error(`Customer not found: ${payload.customer}`);
 
-  products: {
-    group: string;
-    subGroup: string;
-    product: string;
-    quantity: number;
-    discount?: number;
-  }[];
+    let productsSubtotal = 0;
+    const calculatedProducts = [];
 
-  generalDiscountType?: "%" | "flat";
+    for (const item of payload.products) {
+      const product = await ProductModel.findOne({ id: item.product }).session(session);
+      if (!product) throw new Error(`Product not found: ${item.product}`);
 
-  generalDiscountValue?: number;
+      const inventory = await InventoryModel.findOne({ product: product._id }).session(session);
+      if (!inventory) throw new Error(`Inventory record not found for product: ${product.name}`);
 
-  paidAmount: number;
-};
+      if (inventory.currentStock < item.quantity) {
+        throw new Error(`Insufficient stock for ${product.name}. Available: ${inventory.currentStock}`);
+      }
 
-const roundNumber = (
-  value: number
-) => {
-  return Math.round(
-    (value + Number.EPSILON) * 100
-  ) / 100;
-};
+      const price = product.sellingPrice;
+      const totalPrice = roundNumber(price * item.quantity);
+      const itemDiscount = roundNumber(item.discount ?? 0);
+      const afterDiscount = roundNumber(totalPrice - itemDiscount);
 
-const getSaleOrderById = async (
-  id: string
-) => {
-  const result =
-    await SaleOrderModel.findById(id)
-      .populate({
-        path: "customer",
-        select:
-          "_id id name division address phone sr status",
-      })
-      .populate({
-        path: "products.group",
-        select:
-          "_id id groupName",
-      })
-      .populate({
-        path: "products.subGroup",
-        select:
-          "_id id subGroupName group",
-      })
-      .populate({
-        path: "products.product",
-        select:
-          "_id id name sellingPrice purchasePrice stock unit weight group subGroup",
+      productsSubtotal = roundNumber(productsSubtotal + afterDiscount);
+
+      calculatedProducts.push({
+        group: product.group,
+        subGroup: product.subGroup,
+        product: product._id,
+        quantity: item.quantity,
+        price,
+        discount: itemDiscount,
+        totalPrice,
+        afterDiscount,
       });
+    }
 
-  return result;
+    let grandTotal = productsSubtotal;
+
+    // Apply General Discount if provided
+    if (payload.generalDiscountType && payload.generalDiscountValue) {
+      if (payload.generalDiscountType === "%") {
+        const discountAmount = (grandTotal * payload.generalDiscountValue) / 100;
+        grandTotal = roundNumber(grandTotal - discountAmount);
+      } else if (payload.generalDiscountType === "flat") {
+        grandTotal = roundNumber(grandTotal - payload.generalDiscountValue);
+      }
+    }
+
+    const dueAmount = roundNumber(grandTotal - payload.paidAmount);
+
+    const createdOrder = await SaleOrderModel.create([{
+      ...payload,
+      customer: customer._id,
+      products: calculatedProducts,
+      grandTotal,
+      dueAmount,
+    }], { session });
+
+    // Deduct stock from Inventory
+    for (const item of calculatedProducts) {
+      const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
+      if (inventory) {
+        const updatedCurrentStock = inventory.currentStock - item.quantity;
+        const updatedTotalSell = (inventory.totalSell || 0) + item.quantity;
+        const updatedTotalStock = Math.max(0, inventory.totalStock - item.quantity);
+
+        await InventoryModel.findOneAndUpdate(
+          { product: item.product },
+          {
+            $set: {
+              currentStock: updatedCurrentStock,
+              totalStock: updatedTotalStock,
+              totalSell: updatedTotalSell,
+              totalStockValue: Number((updatedCurrentStock * inventory.avgBuyingPrice).toFixed(2)),
+              totalSaleValue: Number(((inventory.totalSaleValue || 0) + item.afterDiscount).toFixed(2)),
+            },
+          },
+          { session }
+        );
+      }
+    }
+
+    await session.commitTransaction();
+    return createdOrder[0];
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    await session.endSession();
+  }
 };
 
-const createSaleOrderIntoDB =
-  async (
-    payload: CreateSaleOrderPayload
-  ) => {
-    const session =
-      await mongoose.startSession();
-
-    try {
-      session.startTransaction();
-
-      const customer =
-        await CustomerModel.findOne({
-          id: payload.customer,
-        }).session(session);
-
-      if (!customer) {
-        throw new Error(
-          `Customer not found: ${payload.customer}`
-        );
-      }
-
-      if (
-        !payload.products ||
-        payload.products.length === 0
-      ) {
-        throw new Error(
-          "At least one product is required"
-        );
-      }
-
-      if (
-        payload.paidAmount < 0
-      ) {
-        throw new Error(
-          "Paid amount cannot be negative"
-        );
-      }
-
-      const calculatedProducts =
-        [];
-
-      let productsSubtotal = 0;
-
-      for (
-        const item of payload.products
-      ) {
-        if (
-          item.quantity <= 0
-        ) {
-          throw new Error(
-            "Product quantity must be greater than 0"
-          );
-        }
-
-        const group =
-          await ProductGroupModel.findOne(
-            {
-              id: item.group,
-            }
-          ).session(session);
-
-        if (!group) {
-          throw new Error(
-            `Group not found: ${item.group}`
-          );
-        }
-
-        const subGroup =
-          await ProductSubgroupModel.findOne(
-            {
-              id: item.subGroup,
-            }
-          ).session(session);
-
-        if (!subGroup) {
-          throw new Error(
-            `Sub-group not found: ${item.subGroup}`
-          );
-        }
-
-        if (
-          subGroup.group.toString() !==
-          group._id.toString()
-        ) {
-          throw new Error(
-            "Selected sub-group does not belong to selected group"
-          );
-        }
-
-        const product =
-          await ProductModel.findOne({
-            id: item.product,
-          }).session(session);
-
-        if (!product) {
-          throw new Error(
-            `Product not found: ${item.product}`
-          );
-        }
-
-        if (
-          product.group.toString() !==
-          group._id.toString()
-        ) {
-          throw new Error(
-            "Selected product does not belong to selected group"
-          );
-        }
-
-        if (
-          product.subGroup.toString() !==
-          subGroup._id.toString()
-        ) {
-          throw new Error(
-            "Selected product does not belong to selected sub-group"
-          );
-        }
-
-        const productStock =
-          product.stock;
-
-        if (
-          productStock <
-          item.quantity
-        ) {
-          throw new Error(
-            `Insufficient stock for ${product.name}. Available stock: ${productStock}`
-          );
-        }
-
-        const price =
-          product.sellingPrice;
-
-        const totalPrice =
-          roundNumber(
-            price * item.quantity
-          );
-
-        const itemDiscount =
-          roundNumber(
-            item.discount ?? 0
-          );
-
-        if (
-          itemDiscount < 0
-        ) {
-          throw new Error(
-            `Discount cannot be negative for ${product.name}`
-          );
-        }
-
-        if (
-          itemDiscount >
-          totalPrice
-        ) {
-          throw new Error(
-            `Discount cannot be greater than total price for ${product.name}`
-          );
-        }
-
-        const afterDiscount =
-          roundNumber(
-            totalPrice -
-              itemDiscount
-          );
-
-        productsSubtotal =
-          roundNumber(
-            productsSubtotal +
-              afterDiscount
-          );
-
-        calculatedProducts.push({
-          group: group._id,
-
-          subGroup:
-            subGroup._id,
-
-          product:
-            product._id,
-
-          quantity:
-            item.quantity,
-
-          price,
-
-          discount:
-            itemDiscount,
-
-          totalPrice,
-
-          afterDiscount,
-        });
-      }
-
-      let generalDiscount = 0;
-
-      const generalDiscountValue =
-        payload.generalDiscountValue ??
-        0;
-
-      if (
-        generalDiscountValue < 0
-      ) {
-        throw new Error(
-          "General discount cannot be negative"
-        );
-      }
-
-      if (
-        generalDiscountValue > 0
-      ) {
-        if (
-          payload.generalDiscountType ===
-          "%"
-        ) {
-          if (
-            generalDiscountValue >
-            100
-          ) {
-            throw new Error(
-              "Percentage discount cannot be greater than 100%"
-            );
-          }
-
-          generalDiscount =
-            roundNumber(
-              (productsSubtotal *
-                generalDiscountValue) /
-                100
-            );
-        } else if (
-          payload.generalDiscountType ===
-          "flat"
-        ) {
-          generalDiscount =
-            roundNumber(
-              generalDiscountValue
-            );
-        } else {
-          throw new Error(
-            "Invalid general discount type"
-          );
-        }
-      }
-
-      if (
-        generalDiscount >
-        productsSubtotal
-      ) {
-        throw new Error(
-          "General discount cannot be greater than order total"
-        );
-      }
-
-      const grandTotal =
-        roundNumber(
-          productsSubtotal -
-            generalDiscount
-        );
-
-      if (
-        payload.paidAmount >
-        grandTotal
-      ) {
-        throw new Error(
-          "Paid amount cannot be greater than grand total"
-        );
-      }
-
-      const dueAmount =
-        roundNumber(
-          grandTotal -
-            payload.paidAmount
-        );
-
-      const createdOrder =
-        await SaleOrderModel.create(
-          [
-            {
-              stateOrRegion:
-                payload.stateOrRegion,
-
-              customer:
-                customer._id,
-
-              orderDate:
-                new Date(
-                  payload.orderDate
-                ),
-
-              products:
-                calculatedProducts,
-
-              generalDiscountType:
-                payload.generalDiscountType,
-
-              generalDiscountValue,
-
-              paidAmount:
-                payload.paidAmount,
-
-              grandTotal,
-
-              dueAmount,
-            },
-          ],
-          {
-            session,
-          }
-        );
-
-      for (
-        const item of calculatedProducts
-      ) {
-        const updatedProduct =
-          await ProductModel.findOneAndUpdate(
-            {
-              _id: item.product,
-
-              stock: {
-                $gte:
-                  item.quantity,
-              },
-            },
-            {
-              $inc: {
-                stock:
-                  -item.quantity,
-              },
-            },
-            {
-              new: true,
-              session,
-            }
-          );
-
-        if (!updatedProduct) {
-          throw new Error(
-            "Stock changed while creating order. Please try again."
-          );
-        }
-      }
-
-      await session.commitTransaction();
-
-      return await getSaleOrderById(
-        createdOrder[0]._id.toString()
-      );
-    } catch (error) {
-      await session.abortTransaction();
-
-      throw error;
-    } finally {
-      await session.endSession();
-    }
-  };
+const getSaleOrderById = async (id: string) => {
+  return await SaleOrderModel.findById(id)
+    .populate("customer")
+    .populate("products.product")
+    .populate("products.group")
+    .populate("products.subGroup");
+};
 
 export const SaleOrderServices = {
   createSaleOrderIntoDB,

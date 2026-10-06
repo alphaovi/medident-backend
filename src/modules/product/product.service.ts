@@ -1,126 +1,78 @@
-import { ProductGroupModel } from "../productGroup/productGroup.model.js";
-import { ProductSubgroupModel } from "../productSubgroup/productSubgroup.model.js";
+import mongoose from "mongoose";
 import { ProductDetails } from "./product.interface.js";
 import { ProductModel } from "./product.model.js";
+import { InventoryModel } from "../inventory/inventory.model.js";
 
-const validateGroupAndSubgroup = async (
-  group: string,
-  subGroup: string
-) => {
-  const productGroup =
-    await ProductGroupModel.findById(group);
+const createProductIntoDB = async (payload: ProductDetails) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  if (!productGroup) {
-    throw new Error(
-      "Product group not found"
+  try {
+    const createdProduct = await ProductModel.create([payload], { session });
+    const product = createdProduct[0];
+
+    // প্রোডাক্ট ক্রিয়েট হওয়ার সাথে সাথে ইনভেন্টরিতে ইনিডিয়াল এন্ট্রি তৈরি হবে (সব স্টক ০ থাকবে)
+    await InventoryModel.create(
+      [
+        {
+          product: product._id,
+          group: product.group,
+          subGroup: product.subGroup,
+          totalStock: 0,
+          currentStock: 0,
+          onTransit: 0,
+          totalSell: 0,
+          damaged: 0,
+          lost: 0,
+          freeSample: 0,
+          avgBuyingPrice: product.purchasePrice,
+          totalStockValue: 0,
+          totalSaleValue: 0,
+        },
+      ],
+      { session }
     );
-  }
 
-  const productSubgroup =
-    await ProductSubgroupModel.findOne({
-      _id: subGroup,
-      group: group,
-    });
+    await session.commitTransaction();
+    session.endSession();
 
-  if (!productSubgroup) {
-    throw new Error(
-      "Product subgroup does not belong to the selected product group"
-    );
-  }
-};
-
-const CreateProductIntoDB = async (
-  productDetails: ProductDetails
-) => {
-  await validateGroupAndSubgroup(
-    productDetails.group.toString(),
-    productDetails.subGroup.toString()
-  );
-
-  const result = await ProductModel.create(
-    productDetails
-  );
-
-  return result.populate([
-    "group",
-    "subGroup",
-  ]);
-};
-
-const getAllProductsFromDB = async () => {
-  const result = await ProductModel.find()
-    .populate("group")
-    .populate("subGroup");
-
-  return result;
-};
-
-const getSingleProductFromDB = async (
-  id: string
-) => {
-  const result = await ProductModel.findOne({
-    id,
-  })
-    .populate("group")
-    .populate("subGroup");
-
-  return result;
-};
-
-const updateProductIntoDB = async (
-  id: string,
-  productDetails: Partial<ProductDetails>
-) => {
-  const existingProduct =
-    await ProductModel.findOne({ id });
-
-  if (!existingProduct) {
-    throw new Error("Product not found");
-  }
-
-  const group =
-    productDetails.group?.toString() ??
-    existingProduct.group.toString();
-
-  const subGroup =
-    productDetails.subGroup?.toString() ??
-    existingProduct.subGroup.toString();
-
-  await validateGroupAndSubgroup(
-    group,
-    subGroup
-  );
-
-  const result =
-    await ProductModel.findOneAndUpdate(
-      { id },
-      productDetails,
-      {
-        new: true,
-        runValidators: true,
-      }
-    )
+    const result = await ProductModel.findById(product._id)
       .populate("group")
       .populate("subGroup");
 
-  return result;
+    return result;
+  } catch (error: any) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
 };
 
-const deleteSingleProductFromDB = async (
-  id: string
-) => {
-  const result =
-    await ProductModel.findOneAndDelete({
-      id,
-    });
-
-  return result;
+const getAllProductsFromDB = async () => {
+  return await ProductModel.find().populate("group").populate("subGroup");
 };
 
-export const ProductDetailsServices = {
-  CreateProductIntoDB,
+const getSingleProductFromDB = async (id: string) => {
+  return await ProductModel.findOne({ id }).populate("group").populate("subGroup");
+};
+
+const updateProductInDB = async (id: string, payload: Partial<ProductDetails>) => {
+  return await ProductModel.findOneAndUpdate({ id }, payload, {
+    new: true,
+    runValidators: true,
+  })
+    .populate("group")
+    .populate("subGroup");
+};
+
+const deleteProductFromDB = async (id: string) => {
+  return await ProductModel.findOneAndDelete({ id });
+};
+
+export const ProductServices = {
+  createProductIntoDB,
   getAllProductsFromDB,
   getSingleProductFromDB,
-  updateProductIntoDB,
-  deleteSingleProductFromDB,
+  updateProductInDB,
+  deleteProductFromDB,
 };

@@ -1,57 +1,22 @@
 import { Schema, model } from "mongoose";
-import { Inventory } from "./inventory.interface.js";
 
-const inventorySchema = new Schema<Inventory>(
+const inventorySchema = new Schema(
   {
-    product: {
-      type: Schema.Types.ObjectId,
-      ref: "Product",
-      required: [true, "Product is required"],
-      unique: true,
-    },
-
-    totalStock: {
-      type: Number,
-      required: [true, "Total stock is required"],
-      min: [0, "Total stock cannot be negative"],
-    },
-
-    totalSell: {
-      type: Number,
-      required: [true, "Total sell is required"],
-      min: [0, "Total sell cannot be negative"],
-    },
-
-    currentStock: {
-      type: Number,
-      required: [true, "Current stock is required"],
-      min: [0, "Current stock cannot be negative"],
-    },
-
-    avgBuyingPrice: {
-      type: Number,
-      required: [true, "Average buying price is required"],
-      min: [0, "Average buying price cannot be negative"],
-    },
-
-    totalStockValue: {
-      type: Number,
-      required: [true, "Total stock value is required"],
-      min: [0, "Total stock value cannot be negative"],
-    },
-
-    totalSaleValue: {
-      type: Number,
-      required: [true, "Total sale value is required"],
-      min: [0, "Total sale value cannot be negative"],
-    },
+    product: { type: Schema.Types.ObjectId, ref: "Product", required: true, unique: true },
+    group: { type: Schema.Types.ObjectId, ref: "ProductGroup", required: true },
+    subGroup: { type: Schema.Types.ObjectId, ref: "ProductSubgroup", required: true },
+    totalStock: { type: Number, default: 0 },
+    totalSell: { type: Number, default: 0 },
+    currentStock: { type: Number, default: 0 },
+    onTransit: { type: Number, default: 0 },
+    damaged: { type: Number, default: 0 },
+    lost: { type: Number, default: 0 },
+    freeSample: { type: Number, default: 0 },
+    avgBuyingPrice: { type: Number, default: 0 },
+    totalStockValue: { type: Number, default: 0 },
+    totalSaleValue: { type: Number, default: 0 },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-export const InventoryModel = model<Inventory>(
-  "Inventory",
-  inventorySchema
-);
+export const InventoryModel = model("Inventory", inventorySchema);

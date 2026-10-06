@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node ./dist/server.js",
     "start:dev": "tsx watch src/server.ts",
     "start:prod": "node ./dist/server.js",
     "build": "tsc",
@@ -21,6 +22,7 @@
     "@eslint/js": "^10.0.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@vercel/node": "^3.0.0",
     "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.12.0",
