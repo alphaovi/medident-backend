@@ -6,7 +6,6 @@ import express, {
 
 import cors from "cors";
 
-
 import { studentRoutes } from "./modules/students/student.route.js";
 import { productGroupRoutes } from "./modules/productGroup/productGroup.route.js";
 import { productSubgroupRoutes } from "./modules/productSubgroup/productSubgroup.route.js";
@@ -23,9 +22,21 @@ import { connectDB } from "./config/config.js";
 const app: Application = express();
 
 app.use(express.json());
-app.use(cors());
 
-// Vercel সার্ভারলেসের জন্য প্রতিটি রিকোয়েস্টে ডাটাবেজ কানেকশন নিশ্চিত করার মিডলওয়্যার
+// CORS এখানে প্রপারলি কনফিগার করা হলো
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173", 
+      "আপনার_ফ্রন্টএন্ডের_লাইভ_ইউআরএল_এখানে_দিন" // যেমন: https://your-frontend.vercel.app
+    ],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+// Vercel সার্ভারলেসের জন্য প্রতিটি রিকোয়েস্টে ডাটাবেজ কানেকশন নিশ্চিত করার মিডলওয়্যার
 app.use(async (req, res, next) => {
   try {
     await connectDB();
