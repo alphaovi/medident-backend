@@ -27,8 +27,9 @@ app.use(express.json());
 app.use(
   cors({
     origin: [
-      "http://localhost:5173", 
-      "আপনার_ফ্রন্টএন্ডের_লাইভ_ইউআরএল_এখানে_দিন" // যেমন: https://your-frontend.vercel.app
+      "http://localhost:5173",
+      "http://localhost:3000",
+      "https://medident-frontend.vercel.app" 
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
