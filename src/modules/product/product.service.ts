@@ -11,7 +11,7 @@ const createProductIntoDB = async (payload: ProductDetails) => {
     const createdProduct = await ProductModel.create([payload], { session });
     const product = createdProduct[0];
 
-    // প্রোডাক্ট ক্রিয়েট হওয়ার সাথে সাথে ইনভেন্টরিতে ইনিডিয়াল এন্ট্রি তৈরি হবে (সব স্টক ০ থাকবে)
+    // প্রোডাক্ট ক্রিয়েট হওয়ার সাথে সাথে ইনভেন্টরিতে ইনিডিয়াল এন্ট্রি তৈরি হবে (সব স্টক ০ থাকবে)
     await InventoryModel.create(
       [
         {
@@ -53,11 +53,11 @@ const getAllProductsFromDB = async () => {
 };
 
 const getSingleProductFromDB = async (id: string) => {
-  return await ProductModel.findOne({ id }).populate("group").populate("subGroup");
+  return await ProductModel.findById(id).populate("group").populate("subGroup");
 };
 
 const updateProductInDB = async (id: string, payload: Partial<ProductDetails>) => {
-  return await ProductModel.findOneAndUpdate({ id }, payload, {
+  return await ProductModel.findByIdAndUpdate(id, payload, {
     new: true,
     runValidators: true,
   })
@@ -66,7 +66,7 @@ const updateProductInDB = async (id: string, payload: Partial<ProductDetails>) =
 };
 
 const deleteProductFromDB = async (id: string) => {
-  return await ProductModel.findOneAndDelete({ id });
+  return await ProductModel.findByIdAndDelete(id);
 };
 
 export const ProductServices = {

@@ -21,12 +21,7 @@ import { connectDB } from "./config/config.js";
 
 const app: Application = express();
 
-app.use(
-  cors({
-    origin: ["http://localhost:5173", "apnar-frontend-production-url"],
-    credentials: true,
-  })
-);
+app.use(cors());
 
 app.use(express.json());
 // Vercel সার্ভারলেসের জন্য প্রতিটি রিকোয়েস্টে ডাটাবেজ কানেকশন নিশ্চিত করার মিডলওয়্যার
