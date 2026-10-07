@@ -25,10 +25,7 @@ app.use(express.json());
 
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173", // Eta thaktei hobe local testing er jonno
-      "https://medident-backend-1541usaqk-ovi778811gmailcoms-projects.vercel.app", // ba apnar live frontend url
-    ],
+    origin: true, // ডেভেলপমেন্টের সুবিধার জন্য সব অরিজিন অ্যালাউ করবে (অথবা ["http://localhost:5173"] রাখতে পারেন)
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
