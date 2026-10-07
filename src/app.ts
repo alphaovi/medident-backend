@@ -21,17 +21,16 @@ import { connectDB } from "./config/config.js";
 
 const app: Application = express();
 
-app.use(express.json());
-
 app.use(
   cors({
-    origin: true, // ডেভেলপমেন্টের সুবিধার জন্য সব অরিজিন অ্যালাউ করবে (অথবা ["http://localhost:5173"] রাখতে পারেন)
+    origin: "*", // সাময়িকভাবে সব অরিজিন এলাউ করার জন্য, অথবা 'http://localhost:5173' দিতে পারো
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
+app.use(express.json());
 // Vercel সার্ভারলেসের জন্য প্রতিটি রিকোয়েস্টে ডাটাবেজ কানেকশন নিশ্চিত করার মিডলওয়্যার
 app.use(async (req, res, next) => {
   try {
