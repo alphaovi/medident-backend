@@ -23,13 +23,11 @@ const app: Application = express();
 
 app.use(express.json());
 
-// CORS এখানে প্রপারলি কনফিগার করা হলো
 app.use(
   cors({
     origin: [
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "https://medident-frontend.vercel.app" 
+      "http://localhost:5173", // Eta thaktei hobe local testing er jonno
+      "https://medident-backend-1541usaqk-ovi778811gmailcoms-projects.vercel.app", // ba apnar live frontend url
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
