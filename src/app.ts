@@ -23,10 +23,8 @@ const app: Application = express();
 
 app.use(
   cors({
-    origin: "*", // সাময়িকভাবে সব অরিজিন এলাউ করার জন্য, অথবা 'http://localhost:5173' দিতে পারো
+    origin: ["http://localhost:5173", "apnar-frontend-production-url"],
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
@@ -65,4 +63,3 @@ const getAController = (req: Request, res: Response) => {
 app.get("/", getAController);
 
 export default app;
- 
