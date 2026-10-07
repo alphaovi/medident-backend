@@ -19,8 +19,7 @@ export const createProductGroupValidationSchema = z.object({
           error: "Product group id is required",
         })
         .trim()
-        .min(1, "Product group id cannot be empty")
-        .optional(), // Ekhane .optional() add kora holo
+        .min(1, "Product group id cannot be empty"),
 
       groupName: z
         .string({
