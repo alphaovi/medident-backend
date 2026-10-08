@@ -18,6 +18,7 @@ import { ProductRoutes } from "./modules/product/product.route.js";
 import { InventoryRoutes } from "./modules/inventory/inventory.route.js";
 import { stockAdjustmentRoutes } from "./modules/stockAdjustment/stockAdjustment.route.js";
 import { connectDB } from "./config/config.js";
+import { StateRoutes } from "./modules/state/state.route.js";
 
 const app: Application = express();
 
@@ -50,6 +51,7 @@ app.use("/api/v1/inventory", InventoryRoutes);
 app.use("/api/v1/purchase-orders", PurchaseOrderRoutes);
 app.use("/api/v1/suppliers", supplierRoutes);
 app.use("/api/v1/stock-adjustment", stockAdjustmentRoutes);
+app.use("/api/v1/states", StateRoutes);
 
 const getAController = (req: Request, res: Response) => {
   res.send("After Solving problem, project is running in server successfully.");
