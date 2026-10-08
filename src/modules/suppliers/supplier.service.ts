@@ -15,13 +15,11 @@ const createSupplierIntoDB = async (payload: Suppliers) => {
   }
 
   const result = await SupplierModel.create(payload);
-
   return result;
 };
 
 const getAllSuppliersFromDB = async () => {
   const result = await SupplierModel.find().sort({ createdAt: -1 });
-
   return result;
 };
 

@@ -26,13 +26,14 @@ const SupplierSchema = new Schema<Suppliers>(
       required: [true, "Supplier address is required"],
       trim: true,
     },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   {
     timestamps: true,
   }
 );
 
-export const SupplierModel = model<Suppliers>(
-  "Supplier",
-  SupplierSchema
-);
+export const SupplierModel = model<Suppliers>("Supplier", SupplierSchema);

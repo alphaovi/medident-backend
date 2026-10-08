@@ -1,11 +1,9 @@
 import { Request, Response } from "express";
 import { SupplierServices } from "./supplier.service.js";
 
-
 const createSupplier = async (req: Request, res: Response) => {
   try {
     const { supplier } = req.body;
-
     const result = await SupplierServices.createSupplierIntoDB(supplier);
 
     res.status(201).json({
@@ -43,9 +41,7 @@ const getAllSuppliers = async (req: Request, res: Response) => {
 const getSingleSupplier = async (req: Request, res: Response) => {
   try {
     const supplierId = String(req.params.supplierId);
-
-    const result =
-      await SupplierServices.getSingleSupplierFromDB(supplierId);
+    const result = await SupplierServices.getSingleSupplierFromDB(supplierId);
 
     res.status(200).json({
       success: true,
@@ -64,7 +60,6 @@ const getSingleSupplier = async (req: Request, res: Response) => {
 const updateSupplier = async (req: Request, res: Response) => {
   try {
     const supplierId = String(req.params.supplierId);
-
     const result = await SupplierServices.updateSupplierIntoDB(
       supplierId,
       req.body
@@ -87,9 +82,7 @@ const updateSupplier = async (req: Request, res: Response) => {
 const deleteSupplier = async (req: Request, res: Response) => {
   try {
     const supplierId = String(req.params.supplierId);
-
-    const result =
-      await SupplierServices.deleteSupplierFromDB(supplierId);
+    const result = await SupplierServices.deleteSupplierFromDB(supplierId);
 
     res.status(200).json({
       success: true,

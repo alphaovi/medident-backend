@@ -3,4 +3,5 @@ export type Suppliers = {
   supplierName: string;
   supplierPhoneNo: string;
   supplierAddress: string;
+  isActive: boolean;
 };
