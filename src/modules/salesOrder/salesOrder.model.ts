@@ -33,6 +33,12 @@ const saleOrderSchema = new Schema<SaleOrder>(
     paidAmount: { type: Number, required: true, min: 0 },
     grandTotal: { type: Number, required: true, min: 0 },
     dueAmount: { type: Number, required: true, min: 0 },
+    status: {
+      type: String,
+      enum: ["pending", "approved", "delivered"],
+      default: "pending",
+      required: true,
+    },
   },
   { timestamps: true }
 );

@@ -21,10 +21,29 @@ const createSaleOrder = async (req: Request, res: Response) => {
   }
 };
 
+const getAllSaleOrders = async (req: Request, res: Response) => {
+  try {
+    const result = await SaleOrderServices.getAllSaleOrdersFromDB();
+
+    res.status(200).json({
+      success: true,
+      message: "Sale orders retrieved successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong",
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+};
+
 const getSaleOrder = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const result = await SaleOrderServices.getSaleOrderById(id);
+    const result = await SaleOrderServices.getSaleOrderByIdFromDB(id);
 
     if (!result) {
       res.status(404).json({
@@ -50,7 +69,52 @@ const getSaleOrder = async (req: Request, res: Response) => {
   }
 };
 
+const updateOrderStatus = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { status } = req.body;
+
+    const result = await SaleOrderServices.updateSaleOrderStatusIntoDB(id, status);
+
+    res.status(200).json({
+      success: true,
+      message: `Sale order status updated to ${status} successfully`,
+      data: result,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(400).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Something went wrong",
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+};
+
+const deleteSaleOrder = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const result = await SaleOrderServices.deleteSaleOrderFromDB(id);
+
+    res.status(200).json({
+      success: true,
+      message: "Sale order deleted successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(400).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Something went wrong",
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+};
+
 export const SaleOrderControllers = {
   createSaleOrder,
+  getAllSaleOrders,
   getSaleOrder,
+  updateOrderStatus,
+  deleteSaleOrder,
 };

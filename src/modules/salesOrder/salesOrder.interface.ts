@@ -1,5 +1,7 @@
 import { Types } from "mongoose";
 
+export type OrderStatus = "pending" | "approved" | "delivered";
+
 export type OrderItem = {
   group: Types.ObjectId;
   subGroup: Types.ObjectId;
@@ -21,4 +23,5 @@ export type SaleOrder = {
   paidAmount: number;
   grandTotal: number;
   dueAmount: number;
+  status: OrderStatus;
 };

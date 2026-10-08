@@ -18,6 +18,15 @@ export const createSaleOrderValidationSchema = z.object({
       generalDiscountType: z.enum(["%", "flat"]).optional(),
       generalDiscountValue: z.number({ required_error: "General discount must be a number" }).min(0, "General discount cannot be negative").optional(),
       paidAmount: z.number({ required_error: "Paid amount must be a number" }).min(0, "Paid amount cannot be negative"),
+      status: z.enum(["pending", "approved", "delivered"]).optional(),
+    }),
+  }),
+});
+
+export const updateOrderStatusValidationSchema = z.object({
+  body: z.object({
+    status: z.enum(["pending", "approved", "delivered"], {
+      required_error: "Status is required",
     }),
   }),
 });
