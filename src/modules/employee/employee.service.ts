@@ -30,15 +30,22 @@ const validateAssignedCustomers = async (
 const createEmployeeIntoDB = async (
   employee: Employee
 ) => {
-  await validateAssignedCustomers(
-    employee.assignCustomers
-  );
+  if (employee.assignCustomers && employee.assignCustomers.length > 0) {
+    await validateAssignedCustomers(employee.assignCustomers);
+  }
 
   const result = await EmployeeModel.create(employee);
 
-  return result.populate(
-    "assignCustomers.customer"
-  );
+  // Update customer sr reference for created employee
+  if (employee.assignCustomers && employee.assignCustomers.length > 0) {
+    for (const item of employee.assignCustomers) {
+      await CustomerModel.findByIdAndUpdate(item.customer, {
+        sr: result._id,
+      });
+    }
+  }
+
+  return result.populate("assignCustomers.customer");
 };
 
 const getAllEmployeesFromDB = async () => {
@@ -69,9 +76,7 @@ const updateEmployeeIntoDB = async (
     let result = null;
     await session.withTransaction(async () => {
       const existingEmployee =
-        await EmployeeModel.findOne({ id }).session(
-          session
-        );
+        await EmployeeModel.findOne({ id }).session(session);
 
       if (!existingEmployee) {
         throw new Error("Employee not found");
@@ -83,8 +88,8 @@ const updateEmployeeIntoDB = async (
           session
         );
 
-        const oldCustomers = existingEmployee.assignCustomers || [];
         const newCustomers = employee.assignCustomers || [];
+        const oldCustomers = existingEmployee.assignCustomers || [];
 
         const oldCustomerIds = oldCustomers.map(
           (item) => (item.customer ? item.customer.toString() : "")
@@ -94,79 +99,37 @@ const updateEmployeeIntoDB = async (
           (item) => (item.customer ? item.customer.toString() : "")
         );
 
-        const removedCustomerIds =
-          oldCustomerIds.filter(
-            (customerId) =>
-              customerId && !newCustomerIds.includes(customerId)
-          );
+        // 1. Release customers that were removed
+        const removedCustomerIds = oldCustomerIds.filter(
+          (customerId) => customerId && !newCustomerIds.includes(customerId)
+        );
 
         for (const customerId of removedCustomerIds) {
-          const customer =
-            await CustomerModel.findById(
-              customerId
-            ).session(session);
-
-          if (!customer) {
-            continue;
-          }
-
-          if (
-            customer.sr &&
-            customer.sr.toString() ===
-            existingEmployee._id.toString()
-          ) {
-            throw new Error(
-              `Customer ${customer.id} must be assigned to another employee before removing`
-            );
-          }
+          await CustomerModel.findByIdAndUpdate(
+            customerId,
+            { $set: { sr: null } },
+            { session }
+          );
         }
 
+        // 2. Assign new customers and update their sr reference
         for (const assignedCustomer of newCustomers) {
-          const customer =
-            await CustomerModel.findById(
-              assignedCustomer.customer
-            ).session(session);
+          const customerDoc = await CustomerModel.findById(
+            assignedCustomer.customer
+          ).session(session);
 
-          if (!customer) {
+          if (!customerDoc) {
             throw new Error(
               `Customer not found: ${assignedCustomer.customer}`
             );
           }
 
-          // Safe check: if customer.sr is null or different from existing employee
-          if (
-            !customer.sr ||
-            customer.sr.toString() !==
-            existingEmployee._id.toString()
-          ) {
-            if (customer.sr) {
-              await EmployeeModel.updateOne(
-                {
-                  _id: customer.sr,
-                },
-                {
-                  $pull: {
-                    assignCustomers: {
-                      customer: customer._id,
-                    },
-                  },
-                },
-                {
-                  session,
-                }
-              );
-            }
-
-            customer.sr = existingEmployee._id;
-
-            await customer.save({
-              session,
-            });
-          }
+          customerDoc.sr = existingEmployee._id;
+          await customerDoc.save({ session });
         }
       }
 
-      await EmployeeModel.findOneAndUpdate(
+      result = await EmployeeModel.findOneAndUpdate(
         { id },
         employee,
         {
@@ -195,18 +158,21 @@ const deleteSingleEmployeeFromDB = async (
   try {
     await session.withTransaction(async () => {
       const employee =
-        await EmployeeModel.findOne({ id }).session(
-          session
-        );
+        await EmployeeModel.findOne({ id }).session(session);
 
       if (!employee) {
         throw new Error("Employee not found");
       }
 
       if (employee.assignCustomers && employee.assignCustomers.length > 0) {
-        throw new Error(
-          "Cannot delete employee with assigned customers"
-        );
+        // Free up associated customers sr reference before deleting
+        for (const item of employee.assignCustomers) {
+          await CustomerModel.findByIdAndUpdate(
+            item.customer,
+            { $set: { sr: null } },
+            { session }
+          );
+        }
       }
 
       await EmployeeModel.findOneAndDelete(
