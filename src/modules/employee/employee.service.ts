@@ -66,6 +66,7 @@ const updateEmployeeIntoDB = async (
   const session = await mongoose.startSession();
 
   try {
+    let result = null;
     await session.withTransaction(async () => {
       const existingEmployee =
         await EmployeeModel.findOne({ id }).session(
@@ -82,24 +83,21 @@ const updateEmployeeIntoDB = async (
           session
         );
 
-        const oldCustomers =
-          existingEmployee.assignCustomers;
-
-        const newCustomers =
-          employee.assignCustomers;
+        const oldCustomers = existingEmployee.assignCustomers || [];
+        const newCustomers = employee.assignCustomers || [];
 
         const oldCustomerIds = oldCustomers.map(
-          (item) => item.customer.toString()
+          (item) => (item.customer ? item.customer.toString() : "")
         );
 
         const newCustomerIds = newCustomers.map(
-          (item) => item.customer.toString()
+          (item) => (item.customer ? item.customer.toString() : "")
         );
 
         const removedCustomerIds =
           oldCustomerIds.filter(
             (customerId) =>
-              !newCustomerIds.includes(customerId)
+              customerId && !newCustomerIds.includes(customerId)
           );
 
         for (const customerId of removedCustomerIds) {
@@ -113,6 +111,7 @@ const updateEmployeeIntoDB = async (
           }
 
           if (
+            customer.sr &&
             customer.sr.toString() ===
             existingEmployee._id.toString()
           ) {
@@ -134,28 +133,31 @@ const updateEmployeeIntoDB = async (
             );
           }
 
+          // Safe check: if customer.sr is null or different from existing employee
           if (
+            !customer.sr ||
             customer.sr.toString() !==
             existingEmployee._id.toString()
           ) {
-            await EmployeeModel.updateOne(
-              {
-                _id: customer.sr,
-              },
-              {
-                $pull: {
-                  assignCustomers: {
-                    customer: customer._id,
+            if (customer.sr) {
+              await EmployeeModel.updateOne(
+                {
+                  _id: customer.sr,
+                },
+                {
+                  $pull: {
+                    assignCustomers: {
+                      customer: customer._id,
+                    },
                   },
                 },
-              },
-              {
-                session,
-              }
-            );
+                {
+                  session,
+                }
+              );
+            }
 
-            customer.sr =
-              existingEmployee._id;
+            customer.sr = existingEmployee._id;
 
             await customer.save({
               session,
@@ -175,7 +177,7 @@ const updateEmployeeIntoDB = async (
       );
     });
 
-    const result = await EmployeeModel.findOne({
+    result = await EmployeeModel.findOne({
       id,
     }).populate("assignCustomers.customer");
 
@@ -201,7 +203,7 @@ const deleteSingleEmployeeFromDB = async (
         throw new Error("Employee not found");
       }
 
-      if (employee.assignCustomers.length > 0) {
+      if (employee.assignCustomers && employee.assignCustomers.length > 0) {
         throw new Error(
           "Cannot delete employee with assigned customers"
         );
