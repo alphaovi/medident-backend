@@ -1,3 +1,5 @@
+// src/app/modules/salesOrder/salesOrder.service.ts
+
 import mongoose from "mongoose";
 import { ProductModel } from "../product/product.model.js";
 import { CustomerModel } from "../customers/customer.model.js";
@@ -12,14 +14,24 @@ const createSaleOrderIntoDB = async (payload: any) => {
   try {
     session.startTransaction();
 
-    const customer = await CustomerModel.findOne({ id: payload.customer }).session(session);
+    // Customer query: ObjectId ba custom id jei tai thukuk na keno safely match korbe
+    const customerQuery = mongoose.Types.ObjectId.isValid(payload.customer)
+      ? { $or: [{ id: payload.customer }, { _id: payload.customer }] }
+      : { id: payload.customer };
+
+    const customer = await CustomerModel.findOne(customerQuery).session(session);
     if (!customer) throw new Error(`Customer not found: ${payload.customer}`);
 
     let productsSubtotal = 0;
     const calculatedProducts = [];
 
     for (const item of payload.products) {
-      const product = await ProductModel.findOne({ id: item.product }).session(session);
+      // Product query: ObjectId ba custom id duitai check korbe
+      const productQuery = mongoose.Types.ObjectId.isValid(item.product)
+        ? { $or: [{ id: item.product }, { _id: item.product }] }
+        : { id: item.product };
+
+      const product = await ProductModel.findOne(productQuery).session(session);
       if (!product) throw new Error(`Product not found: ${item.product}`);
 
       const inventory = await InventoryModel.findOne({ product: product._id }).session(session);
@@ -137,7 +149,6 @@ const deleteSaleOrderFromDB = async (id: string) => {
     const order = await SaleOrderModel.findById(id).session(session);
     if (!order) throw new Error("Sale order not found");
 
-    // Optional: Return stock back to inventory if order is deleted
     for (const item of order.products) {
       const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
       if (inventory) {
