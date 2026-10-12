@@ -17,8 +17,7 @@ router.get("/:purchaseId", PurchaseOrderControllers.getSinglePurchaseOrder);
 
 router.patch(
   "/:purchaseId", 
-  // Jodi update validation schema thake tahole ekhane validateRequest use korte paren:
-  // validateRequest(PurchaseOrderValidation.updatePurchaseOrderZodSchema),
+  validateRequest(PurchaseOrderValidation.updatePurchaseOrderZodSchema),
   PurchaseOrderControllers.updatePurchaseOrder
 );
 
