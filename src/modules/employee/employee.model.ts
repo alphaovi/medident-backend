@@ -24,7 +24,6 @@ const EmployeeSchema = new Schema<Employee>(
   {
     id: {
       type: String,
-      required: [true, "Employee id is required"],
       unique: true,
       trim: true,
     },

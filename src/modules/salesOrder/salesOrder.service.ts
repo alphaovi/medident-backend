@@ -7,7 +7,8 @@ import { SaleOrderModel } from "./salesOrder.model.js";
 import { InventoryModel } from "../inventory/inventory.model.js";
 import { OrderStatus } from "./salesOrder.interface.js";
 
-const roundNumber = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+const roundNumber = (value: number) =>
+  Math.round((value + Number.EPSILON) * 100) / 100;
 
 const createSaleOrderIntoDB = async (payload: any) => {
   const session = await mongoose.startSession();
@@ -19,7 +20,8 @@ const createSaleOrderIntoDB = async (payload: any) => {
       ? { $or: [{ id: payload.customer }, { _id: payload.customer }] }
       : { id: payload.customer };
 
-    const customer = await CustomerModel.findOne(customerQuery).session(session);
+    const customer =
+      await CustomerModel.findOne(customerQuery).session(session);
     if (!customer) throw new Error(`Customer not found: ${payload.customer}`);
 
     let productsSubtotal = 0;
@@ -34,11 +36,18 @@ const createSaleOrderIntoDB = async (payload: any) => {
       const product = await ProductModel.findOne(productQuery).session(session);
       if (!product) throw new Error(`Product not found: ${item.product}`);
 
-      const inventory = await InventoryModel.findOne({ product: product._id }).session(session);
-      if (!inventory) throw new Error(`Inventory record not found for product: ${product.name}`);
+      const inventory = await InventoryModel.findOne({
+        product: product._id,
+      }).session(session);
+      if (!inventory)
+        throw new Error(
+          `Inventory record not found for product: ${product.name}`
+        );
 
       if (inventory.currentStock < item.quantity) {
-        throw new Error(`Insufficient stock for ${product.name}. Available: ${inventory.currentStock}`);
+        throw new Error(
+          `Insufficient stock for ${product.name}. Available: ${inventory.currentStock}`
+        );
       }
 
       const price = product.sellingPrice;
@@ -65,7 +74,8 @@ const createSaleOrderIntoDB = async (payload: any) => {
     // Apply General Discount if provided
     if (payload.generalDiscountType && payload.generalDiscountValue) {
       if (payload.generalDiscountType === "%") {
-        const discountAmount = (grandTotal * payload.generalDiscountValue) / 100;
+        const discountAmount =
+          (grandTotal * payload.generalDiscountValue) / 100;
         grandTotal = roundNumber(grandTotal - discountAmount);
       } else if (payload.generalDiscountType === "flat") {
         grandTotal = roundNumber(grandTotal - payload.generalDiscountValue);
@@ -74,22 +84,32 @@ const createSaleOrderIntoDB = async (payload: any) => {
 
     const dueAmount = roundNumber(grandTotal - payload.paidAmount);
 
-    const createdOrder = await SaleOrderModel.create([{
-      ...payload,
-      customer: customer._id,
-      products: calculatedProducts,
-      grandTotal,
-      dueAmount,
-      status: payload.status || "pending",
-    }], { session });
+    const createdOrder = await SaleOrderModel.create(
+      [
+        {
+          ...payload,
+          customer: customer._id,
+          products: calculatedProducts,
+          grandTotal,
+          dueAmount,
+          status: payload.status || "pending",
+        },
+      ],
+      { session }
+    );
 
     // Deduct stock from Inventory
     for (const item of calculatedProducts) {
-      const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
+      const inventory = await InventoryModel.findOne({
+        product: item.product,
+      }).session(session);
       if (inventory) {
         const updatedCurrentStock = inventory.currentStock - item.quantity;
         const updatedTotalSell = (inventory.totalSell || 0) + item.quantity;
-        const updatedTotalStock = Math.max(0, inventory.totalStock - item.quantity);
+        const updatedTotalStock = Math.max(
+          0,
+          inventory.totalStock - item.quantity
+        );
 
         await InventoryModel.findOneAndUpdate(
           { product: item.product },
@@ -98,8 +118,14 @@ const createSaleOrderIntoDB = async (payload: any) => {
               currentStock: updatedCurrentStock,
               totalStock: updatedTotalStock,
               totalSell: updatedTotalSell,
-              totalStockValue: Number((updatedCurrentStock * inventory.avgBuyingPrice).toFixed(2)),
-              totalSaleValue: Number(((inventory.totalSaleValue || 0) + item.afterDiscount).toFixed(2)),
+              totalStockValue: Number(
+                (updatedCurrentStock * inventory.avgBuyingPrice).toFixed(2)
+              ),
+              totalSaleValue: Number(
+                ((inventory.totalSaleValue || 0) + item.afterDiscount).toFixed(
+                  2
+                )
+              ),
             },
           },
           { session }
@@ -133,7 +159,10 @@ const getSaleOrderByIdFromDB = async (id: string) => {
     .populate("products.subGroup");
 };
 
-const updateSaleOrderStatusIntoDB = async (id: string, newStatus: OrderStatus) => {
+const updateSaleOrderStatusIntoDB = async (
+  id: string,
+  newStatus: OrderStatus
+) => {
   const order = await SaleOrderModel.findById(id);
   if (!order) throw new Error("Sale order not found");
 
@@ -150,10 +179,15 @@ const deleteSaleOrderFromDB = async (id: string) => {
     if (!order) throw new Error("Sale order not found");
 
     for (const item of order.products) {
-      const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
+      const inventory = await InventoryModel.findOne({
+        product: item.product,
+      }).session(session);
       if (inventory) {
         const updatedCurrentStock = inventory.currentStock + item.quantity;
-        const updatedTotalSell = Math.max(0, (inventory.totalSell || 0) - item.quantity);
+        const updatedTotalSell = Math.max(
+          0,
+          (inventory.totalSell || 0) - item.quantity
+        );
         const updatedTotalStock = inventory.totalStock + item.quantity;
 
         await InventoryModel.findOneAndUpdate(
@@ -163,8 +197,15 @@ const deleteSaleOrderFromDB = async (id: string) => {
               currentStock: updatedCurrentStock,
               totalStock: updatedTotalStock,
               totalSell: updatedTotalSell,
-              totalStockValue: Number((updatedCurrentStock * inventory.avgBuyingPrice).toFixed(2)),
-              totalSaleValue: Number(Math.max(0, (inventory.totalSaleValue || 0) - item.afterDiscount).toFixed(2)),
+              totalStockValue: Number(
+                (updatedCurrentStock * inventory.avgBuyingPrice).toFixed(2)
+              ),
+              totalSaleValue: Number(
+                Math.max(
+                  0,
+                  (inventory.totalSaleValue || 0) - item.afterDiscount
+                ).toFixed(2)
+              ),
             },
           },
           { session }
@@ -172,7 +213,8 @@ const deleteSaleOrderFromDB = async (id: string) => {
       }
     }
 
-    const deletedOrder = await SaleOrderModel.findByIdAndDelete(id).session(session);
+    const deletedOrder =
+      await SaleOrderModel.findByIdAndDelete(id).session(session);
 
     await session.commitTransaction();
     return deletedOrder;

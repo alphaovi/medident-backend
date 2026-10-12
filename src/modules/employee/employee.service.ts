@@ -4,6 +4,27 @@ import { Employee } from "./employee.interface.js";
 import { EmployeeModel } from "./employee.model.js";
 import { CustomerModel } from "../customers/customer.model.js";
 
+// Helper function to generate unique employee id (e.g. EMP-0001)
+const generateEmployeeId = async (): Promise<string> => {
+  const lastEmployee = await EmployeeModel.findOne(
+    {},
+    { id: 1 }
+  )
+    .sort({ createdAt: -1 })
+    .lean();
+
+  let nextIdNumber = 1;
+
+  if (lastEmployee && lastEmployee.id) {
+    const numericPart = parseInt(lastEmployee.id.replace("EMP-", ""), 10);
+    if (!isNaN(numericPart)) {
+      nextIdNumber = numericPart + 1;
+    }
+  }
+
+  return `EMP-${String(nextIdNumber).padStart(4, "0")}`;
+};
+
 const validateAssignedCustomers = async (
   assignCustomers: Employee["assignCustomers"],
   session?: mongoose.ClientSession
@@ -33,6 +54,9 @@ const createEmployeeIntoDB = async (
   if (employee.assignCustomers && employee.assignCustomers.length > 0) {
     await validateAssignedCustomers(employee.assignCustomers);
   }
+
+  // Generate unique employee ID from backend
+  employee.id = await generateEmployeeId();
 
   const result = await EmployeeModel.create(employee);
 

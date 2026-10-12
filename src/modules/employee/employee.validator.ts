@@ -46,13 +46,6 @@ const assignCustomerValidation = z.object({
 export const createEmployeeValidationSchema = z.object({
   body: z.object({
     employee: z.object({
-      id: z
-        .string({
-          error: "Employee id is required",
-        })
-        .trim()
-        .min(1, "Employee id cannot be empty"),
-
       name: z
         .string({
           error: "Employee name is required",
@@ -90,8 +83,6 @@ export const updateEmployeeValidationSchema = z.object({
   body: z.object({
     employee: z
       .object({
-        id: z.string().trim().min(1, "Employee id cannot be empty").optional(),
-
         name: z
           .string()
           .trim()
@@ -116,7 +107,6 @@ export const updateEmployeeValidationSchema = z.object({
       })
       .refine(
         (data) =>
-          data.id !== undefined ||
           data.name !== undefined ||
           data.designation !== undefined ||
           data.joiningDate !== undefined ||
@@ -125,7 +115,7 @@ export const updateEmployeeValidationSchema = z.object({
           data.status !== undefined ||
           data.assignCustomers !== undefined,
         {
-          message: "At least one field is required for update",
+          message: "Message: At least one field is required for update",
         }
       ),
   }),
