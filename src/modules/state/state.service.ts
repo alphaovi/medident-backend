@@ -11,6 +11,15 @@ const getAllStatesFromDB = async () => {
   return result;
 };
 
+// নতুন আপডেট সার্ভিস ফাংশন
+const updateStateInDB = async (id: string, payload: Partial<States>) => {
+  const result = await State.findByIdAndUpdate(id, payload, {
+    new: true, // আপডেট হওয়ার পর নতুন ডাটা রিটার্ন করবে
+    runValidators: true, // স্কিমা ভ্যালিডেশন চেক করবে
+  });
+  return result;
+};
+
 const deleteStateFromDB = async (id: string) => {
   const result = await State.findByIdAndDelete(id);
   return result;
@@ -19,5 +28,6 @@ const deleteStateFromDB = async (id: string) => {
 export const StateServices = {
   createStateIntoDB,
   getAllStatesFromDB,
+  updateStateInDB, // এক্সপোর্ট করা হলো
   deleteStateFromDB,
 };

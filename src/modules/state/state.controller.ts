@@ -27,7 +27,35 @@ const createState = async (req: Request, res: Response) => {
 const getAllStates = async (_req: Request, res: Response) => {
   try {
     const result = await StateServices.getAllStatesFromDB();
-    res.status(200).json(result); // Direct array return korle apnar frontend-er fetching er shathe match korbe
+    res.status(200).json(result); 
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || "Something went wrong",
+    });
+  }
+};
+
+// নতুন আপডেট কন্ট্রোলার
+const updateState = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const updatedData = req.body;
+
+    const result = await StateServices.updateStateInDB(id, updatedData);
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: "State not found for update",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "State updated successfully",
+      data: result,
+    });
   } catch (error: any) {
     res.status(500).json({
       success: false,
@@ -56,5 +84,6 @@ const deleteState = async (req: Request, res: Response) => {
 export const StateControllers = {
   createState,
   getAllStates,
+  updateState, // এক্সপোর্ট করা হলো
   deleteState,
 };

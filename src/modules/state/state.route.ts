@@ -13,6 +13,10 @@ router.post(
 
 router.get("/", StateControllers.getAllStates);
 
+
+router.patch("/:id", StateControllers.updateState);
+
+
 router.delete("/:id", StateControllers.deleteState);
 
 export const StateRoutes = router;
