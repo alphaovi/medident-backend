@@ -5,9 +5,23 @@ import { PurchaseOrderValidation } from "./purchaseOrder.validation.js";
 
 const router = Router();
 
-router.post("/create-purchase-order", validateRequest(PurchaseOrderValidation.createPurchaseOrderZodSchema), PurchaseOrderControllers.createPurchaseOrder);
+router.post(
+  "/create-purchase-order", 
+  validateRequest(PurchaseOrderValidation.createPurchaseOrderZodSchema), 
+  PurchaseOrderControllers.createPurchaseOrder
+);
+
 router.get("/", PurchaseOrderControllers.getAllPurchaseOrders);
+
 router.get("/:purchaseId", PurchaseOrderControllers.getSinglePurchaseOrder);
-router.patch("/:purchaseId", PurchaseOrderControllers.updatePurchaseOrder); // নতুন আপডেট রাউট
+
+router.patch(
+  "/:purchaseId", 
+  // Jodi update validation schema thake tahole ekhane validateRequest use korte paren:
+  // validateRequest(PurchaseOrderValidation.updatePurchaseOrderZodSchema),
+  PurchaseOrderControllers.updatePurchaseOrder
+);
+
+router.delete("/:purchaseId", PurchaseOrderControllers.deletePurchaseOrder);
 
 export const PurchaseOrderRoutes = router;
