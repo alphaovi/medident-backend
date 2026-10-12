@@ -1,20 +1,45 @@
 import { PurchaseOrderModel } from "./purchaseOrder.model.js";
-// Apnar product model jekhan theke ase oikhane import kore neben:
-// import { ProductModel } from "../product/product.model.js";
+import { InventoryModel } from "../inventory/inventory.model.js"; // Inventory model import kora holo
 
 // 1. Create Purchase Order
 const createPurchaseOrderIntoDB = async (payload: any) => {
-  // Jodi create korar samay status "On Transit" thake, tahoke inventory te inTransit barate hobe
   const result = await PurchaseOrderModel.create(payload);
   
-  if (result.status === "On Transit") {
+  // Jodi create korar samay status "On Transit" ba "Received" thake, tahoke inventory update hobe
+  if (result.status === "On Transit" || result.status === "Received") {
     for (const item of result.items) {
-      // Product Model update example (uncomment and adjust according to your Product schema)
-      /*
-      await ProductModel.findByIdAndUpdate(item.product, {
-        $inc: { inTransit: item.orderQuantity }
-      });
-      */
+      const inventory = await InventoryModel.findOne({ product: item.product });
+
+      if (inventory) {
+        if (result.status === "On Transit") {
+          inventory.onTransit += item.orderQuantity;
+        } else if (result.status === "Received") {
+          inventory.currentStock += item.orderQuantity;
+          inventory.totalStock += item.orderQuantity;
+
+          // Price & Value Calculation
+          const newTotalStockValue = inventory.totalStockValue + (item.orderQuantity * item.unitCost);
+          inventory.totalStockValue = newTotalStockValue;
+          inventory.avgBuyingPrice = inventory.totalStock > 0 ? newTotalStockValue / inventory.totalStock : 0;
+        }
+        await inventory.save();
+      } else {
+        // Jodi inventory record age theke na thake, tobe notun create kore nibe
+        const initialStock = result.status === "Received" ? item.orderQuantity : 0;
+        const initialTransit = result.status === "On Transit" ? item.orderQuantity : 0;
+        const totalStockValue = initialStock * item.unitCost;
+
+        await InventoryModel.create({
+          product: item.product,
+          group: item.group,
+          subGroup: item.subGroup,
+          totalStock: initialStock,
+          currentStock: initialStock,
+          onTransit: initialTransit,
+          avgBuyingPrice: initialStock > 0 ? item.unitCost : 0,
+          totalStockValue: totalStockValue,
+        });
+      }
     }
   }
 
@@ -33,7 +58,7 @@ const getSinglePurchaseOrderFromDB = async (purchaseId: string) => {
   return result;
 };
 
-// 4. Update Purchase Order & Handle Inventory (On Transit -> Received flow)
+// 4. Update Purchase Order & Handle Inventory (Status transition flow)
 const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
   const existingOrder = await PurchaseOrderModel.findOne({ purchaseId });
 
@@ -60,27 +85,50 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
     }
   }
 
-  // Inventory logic handle korchi status change er upor ভিত্তি kore:
+  // Inventory logic handle kora hocche status change er upor ভিত্তি kore:
   if (newStatus && currentStatus !== newStatus) {
     for (const item of existingOrder.items) {
-      if (newStatus === "On Transit") {
-        // Ordered -> On Transit: Inventory te inTransit barbe
-        /*
-        await ProductModel.findByIdAndUpdate(item.product, {
-          $inc: { inTransit: item.orderQuantity }
+      let inventory = await InventoryModel.findOne({ product: item.product });
+
+      if (!inventory) {
+        // Jodi inventory record na thake, tahoke default baniye nibe
+        inventory = await InventoryModel.create({
+          product: item.product,
+          group: item.group,
+          subGroup: item.subGroup,
+          totalStock: 0,
+          currentStock: 0,
+          onTransit: 0,
+          avgBuyingPrice: 0,
+          totalStockValue: 0,
         });
-        */
-      } else if (newStatus === "Received") {
-        // On Transit (or Ordered) -> Received: inTransit theke minus hobe, currentStock a add hobe
-        /*
-        await ProductModel.findByIdAndUpdate(item.product, {
-          $inc: { 
-            inTransit: -item.orderQuantity, 
-            currentStock: item.orderQuantity 
-          }
-        });
-        */
       }
+
+      if (currentStatus === "Ordered" && newStatus === "On Transit") {
+        // Ordered -> On Transit: onTransit barbe
+        inventory.onTransit += item.orderQuantity;
+      } 
+      else if (currentStatus === "On Transit" && newStatus === "Received") {
+        // On Transit -> Received: onTransit theke minus hobe, currentStock o totalStock a add hobe
+        inventory.onTransit = Math.max(0, inventory.onTransit - item.orderQuantity);
+        inventory.currentStock += item.orderQuantity;
+        inventory.totalStock += item.orderQuantity;
+
+        const newTotalStockValue = inventory.totalStockValue + (item.orderQuantity * item.unitCost);
+        inventory.totalStockValue = newTotalStockValue;
+        inventory.avgBuyingPrice = inventory.totalStock > 0 ? newTotalStockValue / inventory.totalStock : 0;
+      } 
+      else if (currentStatus === "Ordered" && newStatus === "Received") {
+        // Ordered -> Received (Direct): currentStock o totalStock a add hobe (onTransit touch korbe na)
+        inventory.currentStock += item.orderQuantity;
+        inventory.totalStock += item.orderQuantity;
+
+        const newTotalStockValue = inventory.totalStockValue + (item.orderQuantity * item.unitCost);
+        inventory.totalStockValue = newTotalStockValue;
+        inventory.avgBuyingPrice = inventory.totalStock > 0 ? newTotalStockValue / inventory.totalStock : 0;
+      }
+
+      await inventory.save();
     }
   }
 
