@@ -2,7 +2,9 @@ import { z } from "zod";
 
 const createProductZodSchema = z.object({
   body: z.object({
-    id: z.string({ required_error: "Product ID is required" }),
+    id: z
+      .string({ required_error: "Product ID is required" })
+      .max(10, { message: "Product ID cannot exceed 10 characters" }),
     name: z.string({ required_error: "Product name is required" }),
     code: z.string({ required_error: "Product code is required" }),
     group: z.string({ required_error: "Group ID is required" }),

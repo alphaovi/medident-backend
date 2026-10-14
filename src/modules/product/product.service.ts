@@ -11,7 +11,7 @@ const createProductIntoDB = async (payload: ProductDetails) => {
     const createdProduct = await ProductModel.create([payload], { session });
     const product = createdProduct[0];
 
-    // প্রোডাক্ট ক্রিয়েট হওয়ার সাথে সাথে ইনভেন্টরিতে ইনিডিয়াল এন্ট্রি তৈরি হবে (সব স্টক ০ থাকবে)
+    // প্রোডাক্ট ক্রিয়েট হওয়ার সাথে সাথে ইনভেন্টরিতে ইনিডিয়াল এন্ট্রি তৈরি হবে
     await InventoryModel.create(
       [
         {

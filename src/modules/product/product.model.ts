@@ -2,7 +2,13 @@ import { Schema, model } from "mongoose";
 
 const productSchema = new Schema(
   {
-    id: { type: String, required: true, unique: true },
+    id: { 
+      type: String, 
+      required: true, 
+      unique: true, 
+      trim: true,
+      maxlength: [10, "Product ID cannot exceed 10 characters"] 
+    },
     name: { type: String, required: true },
     code: { type: String, required: true, unique: true },
     group: { type: Schema.Types.ObjectId, ref: "ProductGroup", required: true },
