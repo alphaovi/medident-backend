@@ -16,14 +16,15 @@ export const createProductGroupValidationSchema = z.object({
     productGroup: z.object({
       id: z
         .string({
-          error: "Product group id is required",
+          required_error: "Product group id is required",
         })
         .trim()
-        .min(1, "Product group id cannot be empty"),
+        .min(1, "Product group id cannot be empty")
+        .optional(), // Jodi frontend theke auto-generate hoy, tahobe optional rakhte paren
 
       groupName: z
         .string({
-          error: "Group name is required",
+          required_error: "Group name is required",
         })
         .trim()
         .min(1, "Group name cannot be empty")
@@ -32,6 +33,24 @@ export const createProductGroupValidationSchema = z.object({
   }),
 });
 
+// --- UPDATE VALIDATION SCHEMA ---
+export const updateProductGroupValidationSchema = z.object({
+  body: z.object({
+    productGroup: z.object({
+      id: z.string().trim().min(1).optional(),
+      groupName: z
+        .string()
+        .trim()
+        .min(1, "Group name cannot be empty")
+        .transform(capitalizeWords)
+        .optional(),
+    }),
+  }),
+});
+
 export type CreateProductGroupInput = z.infer<
   typeof createProductGroupValidationSchema
+>;
+export type UpdateProductGroupInput = z.infer<
+  typeof updateProductGroupValidationSchema
 >;

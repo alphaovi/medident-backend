@@ -1,7 +1,9 @@
 import express from "express";
 import { ProductGroupControllers } from "./productGroup.controller.js";
-
-import { createProductGroupValidationSchema } from "./productGroup.validation.js";
+import {
+  createProductGroupValidationSchema,
+  updateProductGroupValidationSchema,
+} from "./productGroup.validation.js";
 import validateRequest from "../../middlewares/validateRequest.js";
 
 const router = express.Router();
@@ -15,6 +17,13 @@ router.post(
 router.get("/", ProductGroupControllers.getAllProductGroups);
 
 router.get("/:id", ProductGroupControllers.getSingleProductGroup);
+
+// --- UPDATE ROUTE (PATCH) ---
+router.patch(
+  "/:id",
+  validateRequest(updateProductGroupValidationSchema),
+  ProductGroupControllers.updateProductGroup
+);
 
 router.delete("/:id", ProductGroupControllers.deleteSingleProductGroup);
 

@@ -22,10 +22,7 @@ const createProductGroup = async (req: Request, res: Response) => {
   }
 };
 
-const getAllProductGroups = async (
-  req: Request,
-  res: Response
-) => {
+const getAllProductGroups = async (req: Request, res: Response) => {
   try {
     const result =
       await ProductGroupServices.getAllProductGroupsFromDB();
@@ -44,10 +41,7 @@ const getAllProductGroups = async (
   }
 };
 
-const getSingleProductGroup = async (
-  req: Request,
-  res: Response
-) => {
+const getSingleProductGroup = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
 
@@ -68,10 +62,30 @@ const getSingleProductGroup = async (
   }
 };
 
-const deleteSingleProductGroup = async (
-  req: Request,
-  res: Response
-) => {
+// --- UPDATE CONTROLLER (PATCH) ---
+const updateProductGroup = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { productGroup } = req.body;
+
+    const result =
+      await ProductGroupServices.updateProductGroupInDB(id, productGroup);
+
+    res.status(200).json({
+      success: true,
+      message: "Product group updated successfully",
+      data: result,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || "Something went wrong",
+      error,
+    });
+  }
+};
+
+const deleteSingleProductGroup = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
 
@@ -96,5 +110,6 @@ export const ProductGroupControllers = {
   createProductGroup,
   getAllProductGroups,
   getSingleProductGroup,
+  updateProductGroup,
   deleteSingleProductGroup,
 };

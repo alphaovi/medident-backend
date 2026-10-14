@@ -9,7 +9,6 @@ const ProductGroupSchema = new Schema<ProductGroup>(
       trim: true,
       required: [true, "Product group id is required"],
     },
-
     groupName: {
       type: String,
       required: [true, "Group name is required"],
