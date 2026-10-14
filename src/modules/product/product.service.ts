@@ -1,72 +1,36 @@
-import mongoose from "mongoose";
 import { ProductDetails } from "./product.interface.js";
 import { ProductModel } from "./product.model.js";
-import { InventoryModel } from "../inventory/inventory.model.js";
 
 const createProductIntoDB = async (payload: ProductDetails) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
-    const createdProduct = await ProductModel.create([payload], { session });
-    const product = createdProduct[0];
-
-    // প্রোডাক্ট ক্রিয়েট হওয়ার সাথে সাথে ইনভেন্টরিতে ইনিডিয়াল এন্ট্রি তৈরি হবে
-    await InventoryModel.create(
-      [
-        {
-          product: product._id,
-          group: product.group,
-          subGroup: product.subGroup,
-          totalStock: 0,
-          currentStock: 0,
-          onTransit: 0,
-          totalSell: 0,
-          damaged: 0,
-          lost: 0,
-          freeSample: 0,
-          avgBuyingPrice: product.purchasePrice,
-          totalStockValue: 0,
-          totalSaleValue: 0,
-        },
-      ],
-      { session }
-    );
-
-    await session.commitTransaction();
-    session.endSession();
-
-    const result = await ProductModel.findById(product._id)
-      .populate("group")
-      .populate("subGroup");
-
-    return result;
-  } catch (error: any) {
-    await session.abortTransaction();
-    session.endSession();
-    throw error;
-  }
+  const result = await ProductModel.create(payload);
+  return result;
 };
 
 const getAllProductsFromDB = async () => {
-  return await ProductModel.find().populate("group").populate("subGroup");
+  const result = await ProductModel.find().populate("group subGroup");
+  return result;
 };
 
 const getSingleProductFromDB = async (id: string) => {
-  return await ProductModel.findById(id).populate("group").populate("subGroup");
+  // Check korbe id ta MongoDB ObjectId naki custom string (e.g. PROD-5757)
+  const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { id: id };
+  const result = await ProductModel.findOne(query).populate("group subGroup");
+  return result;
 };
 
 const updateProductInDB = async (id: string, payload: Partial<ProductDetails>) => {
-  return await ProductModel.findByIdAndUpdate(id, payload, {
+  const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { id: id };
+  const result = await ProductModel.findOneAndUpdate(query, payload, {
     new: true,
     runValidators: true,
-  })
-    .populate("group")
-    .populate("subGroup");
+  });
+  return result;
 };
 
 const deleteProductFromDB = async (id: string) => {
-  return await ProductModel.findByIdAndDelete(id);
+  const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { id: id };
+  const result = await ProductModel.findOneAndDelete(query);
+  return result;
 };
 
 export const ProductServices = {

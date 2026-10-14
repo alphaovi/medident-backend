@@ -17,7 +17,9 @@ const createProductZodSchema = z.object({
 });
 
 const updateProductZodSchema = z.object({
-  body: createProductZodSchema.shape.body.partial(),
+  body: z.object({
+    product: createProductZodSchema.shape.body.partial().optional(),
+  }).or(createProductZodSchema.shape.body.partial()),
 });
 
 export const ProductValidation = {
