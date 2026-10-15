@@ -60,7 +60,7 @@ const getSinglePurchaseOrderFromDB = async (purchaseId: string) => {
   return result;
 };
 
-// 4. Update Purchase Order & Handle Inventory Accurately
+// 4. Update Purchase Order & Handle Inventory with Net Difference Logic
 const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
   const existingOrder = await PurchaseOrderModel.findOne({ purchaseId });
 
@@ -87,30 +87,41 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
     }
   }
 
-  // STEP 1: Revert old inventory effect if old order was On Transit
+  const newItems = payload.items || existingOrder.items;
+
+  // Build maps for old quantities vs new quantities if status is On Transit
+  const oldTransitMap = new Map<string, number>();
   if (currentStatus === "On Transit") {
-    for (const oldItem of existingOrder.items) {
-      const inventory = await InventoryModel.findOne({ product: oldItem.product });
-      if (inventory) {
-        inventory.onTransit = Math.max(0, inventory.onTransit - oldItem.orderQuantity);
-        await inventory.save();
-      }
+    for (const item of existingOrder.items) {
+      const prodId = String(item.product);
+      oldTransitMap.set(prodId, (oldTransitMap.get(prodId) || 0) + item.orderQuantity);
     }
   }
 
-  // STEP 2: Determine effective items & status for new update
-  const effectiveItems = payload.items || existingOrder.items;
+  const newTransitMap = new Map<string, number>();
+  if (newStatus === "On Transit") {
+    for (const item of newItems) {
+      const prodId = String(item.product);
+      newTransitMap.set(prodId, (newTransitMap.get(prodId) || 0) + Number(item.orderQuantity || 0));
+    }
+  }
 
-  // STEP 3: Apply new inventory effect if new status is On Transit or Received
-  if (newStatus === "On Transit" || newStatus === "Received") {
-    for (const newItem of effectiveItems) {
-      let inventory = await InventoryModel.findOne({ product: newItem.product });
+  // Calculate net difference for each product and update inventory onTransit
+  const allProductIds = new Set([...oldTransitMap.keys(), ...newTransitMap.keys()]);
 
+  for (const prodId of allProductIds) {
+    const oldQty = oldTransitMap.get(prodId) || 0;
+    const newQty = newTransitMap.get(prodId) || 0;
+    const diff = newQty - oldQty; // Net change (+ or -)
+
+    if (diff !== 0) {
+      let inventory = await InventoryModel.findOne({ product: prodId });
       if (!inventory) {
+        const sampleItem = [...existingOrder.items, ...newItems].find(i => String(i.product) === prodId);
         inventory = await InventoryModel.create({
-          product: newItem.product,
-          group: newItem.group,
-          subGroup: newItem.subGroup,
+          product: prodId,
+          group: sampleItem?.group,
+          subGroup: sampleItem?.subGroup,
           totalStock: 0,
           currentStock: 0,
           onTransit: 0,
@@ -119,22 +130,46 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
         });
       }
 
-      if (newStatus === "On Transit") {
-        inventory.onTransit += Number(newItem.orderQuantity || 0);
-      } else if (newStatus === "Received") {
-        inventory.currentStock += Number(newItem.orderQuantity || 0);
-        inventory.totalStock += Number(newItem.orderQuantity || 0);
+      inventory.onTransit = Math.max(0, inventory.onTransit + diff);
+      await inventory.save();
+    }
+  }
 
-        const newTotalStockValue = inventory.totalStockValue + (Number(newItem.orderQuantity || 0) * Number(newItem.unitCost || 0));
-        inventory.totalStockValue = newTotalStockValue;
-        inventory.avgBuyingPrice = inventory.totalStock > 0 ? newTotalStockValue / inventory.totalStock : 0;
+  // If status is updated to Received
+  if (currentStatus !== "Received" && newStatus === "Received") {
+    for (const item of newItems) {
+      let inventory = await InventoryModel.findOne({ product: item.product });
+      if (!inventory) {
+        inventory = await InventoryModel.create({
+          product: item.product,
+          group: item.group,
+          subGroup: item.subGroup,
+          totalStock: 0,
+          currentStock: 0,
+          onTransit: 0,
+          avgBuyingPrice: 0,
+          totalStockValue: 0,
+        });
       }
+
+      const oldQty = oldTransitMap.get(String(item.product)) || 0;
+      if (currentStatus === "On Transit" && oldQty > 0) {
+        inventory.onTransit = Math.max(0, inventory.onTransit - oldQty);
+      }
+
+      const orderQty = Number(item.orderQuantity || 0);
+      inventory.currentStock += orderQty;
+      inventory.totalStock += orderQty;
+
+      const newTotalStockValue = inventory.totalStockValue + (orderQty * Number(item.unitCost || 0));
+      inventory.totalStockValue = newTotalStockValue;
+      inventory.avgBuyingPrice = inventory.totalStock > 0 ? newTotalStockValue / inventory.totalStock : 0;
 
       await inventory.save();
     }
   }
 
-  // STEP 4: Update Purchase Order in DB
+  // Update Purchase Order in DB
   const result = await PurchaseOrderModel.findOneAndUpdate(
     { purchaseId: purchaseId },
     payload,
@@ -159,7 +194,6 @@ const deletePurchaseOrderFromDB = async (purchaseId: string) => {
     throw new Error("Purchase order not found!");
   }
 
-  // If order was On Transit, revert inventory onTransit before deleting
   if (existingOrder.status === "On Transit") {
     for (const item of existingOrder.items) {
       const inventory = await InventoryModel.findOne({ product: item.product });
