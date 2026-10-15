@@ -1,3 +1,4 @@
+// purchaseOrder.validation.ts
 import { z } from "zod";
 
 const purchaseOrderItemValidationSchema = z.object({
@@ -22,7 +23,7 @@ const createPurchaseOrderZodSchema = z.object({
   body: z.object({
     purchaseId: z.string({ required_error: "Purchase ID is required" }),
     purchaseDate: z.string().optional().transform((val) => (val ? new Date(val) : new Date())),
-    expectedDeliveryDate: z.string({ required_error: "Expected delivery date is required" }),
+    expectedDeliveryDate: z.string({ required_error: "Expected delivery date is required" }).transform((val) => new Date(val)),
     supplierName: z.string({ required_error: "Supplier name is required" }),
     items: z.array(purchaseOrderItemValidationSchema),
     shippingCost: z.number().default(0),
@@ -41,7 +42,7 @@ const updatePurchaseOrderZodSchema = z.object({
   body: z.object({
     purchaseId: z.string().optional(),
     purchaseDate: z.string().optional().transform((val) => (val ? new Date(val) : undefined)),
-    expectedDeliveryDate: z.string().optional(),
+    expectedDeliveryDate: z.string().optional().transform((val) => (val ? new Date(val) : undefined)),
     supplierName: z.string().optional(),
     items: z.array(purchaseOrderItemValidationSchema).optional(),
     shippingCost: z.number().optional(),
