@@ -1,45 +1,38 @@
 import { PurchaseOrderModel } from "./purchaseOrder.model.js";
-import { InventoryModel } from "../inventory/inventory.model.js"; // Inventory model import kora holo
+import { InventoryModel } from "../inventory/inventory.model.js";
 
 // 1. Create Purchase Order
 const createPurchaseOrderIntoDB = async (payload: any) => {
   const result = await PurchaseOrderModel.create(payload);
   
-  // Jodi create korar samay status "On Transit" ba "Received" thake, tahoke inventory update hobe
   if (result.status === "On Transit" || result.status === "Received") {
     for (const item of result.items) {
-      const inventory = await InventoryModel.findOne({ product: item.product });
+      let inventory = await InventoryModel.findOne({ product: item.product });
 
-      if (inventory) {
-        if (result.status === "On Transit") {
-          inventory.onTransit += item.orderQuantity;
-        } else if (result.status === "Received") {
-          inventory.currentStock += item.orderQuantity;
-          inventory.totalStock += item.orderQuantity;
-
-          // Price & Value Calculation
-          const newTotalStockValue = inventory.totalStockValue + (item.orderQuantity * item.unitCost);
-          inventory.totalStockValue = newTotalStockValue;
-          inventory.avgBuyingPrice = inventory.totalStock > 0 ? newTotalStockValue / inventory.totalStock : 0;
-        }
-        await inventory.save();
-      } else {
-        // Jodi inventory record age theke na thake, tobe notun create kore nibe
-        const initialStock = result.status === "Received" ? item.orderQuantity : 0;
-        const initialTransit = result.status === "On Transit" ? item.orderQuantity : 0;
-        const totalStockValue = initialStock * item.unitCost;
-
-        await InventoryModel.create({
+      if (!inventory) {
+        inventory = await InventoryModel.create({
           product: item.product,
           group: item.group,
           subGroup: item.subGroup,
-          totalStock: initialStock,
-          currentStock: initialStock,
-          onTransit: initialTransit,
-          avgBuyingPrice: initialStock > 0 ? item.unitCost : 0,
-          totalStockValue: totalStockValue,
+          totalStock: 0,
+          currentStock: 0,
+          onTransit: 0,
+          avgBuyingPrice: 0,
+          totalStockValue: 0,
         });
       }
+
+      if (result.status === "On Transit") {
+        inventory.onTransit += item.orderQuantity;
+      } else if (result.status === "Received") {
+        inventory.currentStock += item.orderQuantity;
+        inventory.totalStock += item.orderQuantity;
+
+        const newTotalStockValue = inventory.totalStockValue + (item.orderQuantity * item.unitCost);
+        inventory.totalStockValue = newTotalStockValue;
+        inventory.avgBuyingPrice = inventory.totalStock > 0 ? newTotalStockValue / inventory.totalStock : 0;
+      }
+      await inventory.save();
     }
   }
 
@@ -69,10 +62,12 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
   const currentStatus = existingOrder.status;
   const newStatus = payload.status;
 
+  // RULE 1: Ekbar Received hoye gele r kono bhabei edit kora jabe na
   if (currentStatus === "Received") {
     throw new Error("This purchase order has already been received and cannot be edited!");
   }
 
+  // RULE 2: Backward status transition block kora (e.g., Received/On Transit theke Ordered-e jawa jabe na)
   if (newStatus && currentStatus !== newStatus) {
     const statusHierarchy: { [key: string]: number } = {
       "Ordered": 1,
@@ -85,13 +80,12 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
     }
   }
 
-  // Inventory logic handle kora hocche status change er upor ভিত্তি kore:
+  // RULE 3: Ordered -> On Transit, On Transit -> Received, ba Ordered -> Received transition er upore base kore inventory update
   if (newStatus && currentStatus !== newStatus) {
     for (const item of existingOrder.items) {
       let inventory = await InventoryModel.findOne({ product: item.product });
 
       if (!inventory) {
-        // Jodi inventory record na thake, tahoke default baniye nibe
         inventory = await InventoryModel.create({
           product: item.product,
           group: item.group,
@@ -105,11 +99,9 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
       }
 
       if (currentStatus === "Ordered" && newStatus === "On Transit") {
-        // Ordered -> On Transit: onTransit barbe
         inventory.onTransit += item.orderQuantity;
       } 
       else if (currentStatus === "On Transit" && newStatus === "Received") {
-        // On Transit -> Received: onTransit theke minus hobe, currentStock o totalStock a add hobe
         inventory.onTransit = Math.max(0, inventory.onTransit - item.orderQuantity);
         inventory.currentStock += item.orderQuantity;
         inventory.totalStock += item.orderQuantity;
@@ -119,7 +111,6 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
         inventory.avgBuyingPrice = inventory.totalStock > 0 ? newTotalStockValue / inventory.totalStock : 0;
       } 
       else if (currentStatus === "Ordered" && newStatus === "Received") {
-        // Ordered -> Received (Direct): currentStock o totalStock a add hobe (onTransit touch korbe na)
         inventory.currentStock += item.orderQuantity;
         inventory.totalStock += item.orderQuantity;
 
