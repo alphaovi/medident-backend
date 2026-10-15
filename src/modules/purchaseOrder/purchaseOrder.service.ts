@@ -24,12 +24,12 @@ const createPurchaseOrderIntoDB = async (payload: any) => {
       }
 
       if (result.status === "On Transit") {
-        inventory.onTransit += item.orderQuantity;
+        inventory.onTransit += Number(item.orderQuantity || 0);
       } else if (result.status === "Received") {
-        inventory.currentStock += item.orderQuantity;
-        inventory.totalStock += item.orderQuantity;
+        inventory.currentStock += Number(item.orderQuantity || 0);
+        inventory.totalStock += Number(item.orderQuantity || 0);
 
-        const newTotalStockValue = inventory.totalStockValue + (item.orderQuantity * item.unitCost);
+        const newTotalStockValue = inventory.totalStockValue + (Number(item.orderQuantity || 0) * Number(item.unitCost || 0));
         inventory.totalStockValue = newTotalStockValue;
         inventory.avgBuyingPrice = inventory.totalStock > 0 ? newTotalStockValue / inventory.totalStock : 0;
       }
@@ -40,7 +40,7 @@ const createPurchaseOrderIntoDB = async (payload: any) => {
   return result;
 };
 
-// 2. Get All Purchase Orders (POPULATED FULLY)
+// 2. Get All Purchase Orders
 const getAllPurchaseOrdersFromDB = async () => {
   const result = await PurchaseOrderModel.find()
     .populate("supplierName")
@@ -50,7 +50,7 @@ const getAllPurchaseOrdersFromDB = async () => {
   return result;
 };
 
-// 3. Get Single Purchase Order by purchaseId (POPULATED FULLY)
+// 3. Get Single Purchase Order
 const getSinglePurchaseOrderFromDB = async (purchaseId: string) => {
   const result = await PurchaseOrderModel.findOne({ purchaseId: purchaseId })
     .populate("supplierName")
@@ -60,7 +60,7 @@ const getSinglePurchaseOrderFromDB = async (purchaseId: string) => {
   return result;
 };
 
-// 4. Update Purchase Order & Handle Inventory with Net Difference Logic
+// 4. Update Purchase Order & Handle Inventory Accurately
 const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
   const existingOrder = await PurchaseOrderModel.findOne({ purchaseId });
 
@@ -87,56 +87,46 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
     }
   }
 
-  const newItems = payload.items || existingOrder.items;
+  const oldItems = existingOrder.items || [];
+  const newItems = payload.items || oldItems;
 
-  // Build maps for old quantities vs new quantities if status is On Transit
-  const oldTransitMap = new Map<string, number>();
-  if (currentStatus === "On Transit") {
-    for (const item of existingOrder.items) {
-      const prodId = String(item.product);
-      oldTransitMap.set(prodId, (oldTransitMap.get(prodId) || 0) + item.orderQuantity);
-    }
-  }
+  // SCENARIO A: If order was "On Transit" and is STILL "On Transit", update inventory based on net difference
+  if (currentStatus === "On Transit" && newStatus === "On Transit") {
+    const oldMap = new Map<string, number>();
+    oldItems.forEach((i: any) => oldMap.set(String(i.product), (oldMap.get(String(i.product)) || 0) + Number(i.orderQuantity || 0)));
 
-  const newTransitMap = new Map<string, number>();
-  if (newStatus === "On Transit") {
-    for (const item of newItems) {
-      const prodId = String(item.product);
-      newTransitMap.set(prodId, (newTransitMap.get(prodId) || 0) + Number(item.orderQuantity || 0));
-    }
-  }
+    const newMap = new Map<string, number>();
+    newItems.forEach((i: any) => newMap.set(String(i.product), (newMap.get(String(i.product)) || 0) + Number(i.orderQuantity || 0)));
 
-  // Calculate net difference for each product and update inventory onTransit
-  const allProductIds = new Set([...oldTransitMap.keys(), ...newTransitMap.keys()]);
+    const allProds = new Set([...oldMap.keys(), ...newMap.keys()]);
 
-  for (const prodId of allProductIds) {
-    const oldQty = oldTransitMap.get(prodId) || 0;
-    const newQty = newTransitMap.get(prodId) || 0;
-    const diff = newQty - oldQty; // Net change (+ or -)
+    for (const prodId of allProds) {
+      const oldQty = oldMap.get(prodId) || 0;
+      const newQty = newMap.get(prodId) || 0;
+      const diff = newQty - oldQty;
 
-    if (diff !== 0) {
-      let inventory = await InventoryModel.findOne({ product: prodId });
-      if (!inventory) {
-        const sampleItem = [...existingOrder.items, ...newItems].find(i => String(i.product) === prodId);
-        inventory = await InventoryModel.create({
-          product: prodId,
-          group: sampleItem?.group,
-          subGroup: sampleItem?.subGroup,
-          totalStock: 0,
-          currentStock: 0,
-          onTransit: 0,
-          avgBuyingPrice: 0,
-          totalStockValue: 0,
-        });
+      if (diff !== 0) {
+        let inventory = await InventoryModel.findOne({ product: prodId });
+        if (!inventory) {
+          const sample = [...oldItems, ...newItems].find((i: any) => String(i.product) === prodId);
+          inventory = await InventoryModel.create({
+            product: prodId,
+            group: sample?.group,
+            subGroup: sample?.subGroup,
+            totalStock: 0,
+            currentStock: 0,
+            onTransit: 0,
+            avgBuyingPrice: 0,
+            totalStockValue: 0,
+          });
+        }
+        inventory.onTransit = Math.max(0, inventory.onTransit + diff);
+        await inventory.save();
       }
-
-      inventory.onTransit = Math.max(0, inventory.onTransit + diff);
-      await inventory.save();
     }
   }
-
-  // If status is updated to Received
-  if (currentStatus !== "Received" && newStatus === "Received") {
+  // SCENARIO B: If order was "Ordered" and is now updated to "On Transit"
+  else if (currentStatus === "Ordered" && newStatus === "On Transit") {
     for (const item of newItems) {
       let inventory = await InventoryModel.findOne({ product: item.product });
       if (!inventory) {
@@ -151,10 +141,37 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
           totalStockValue: 0,
         });
       }
+      inventory.onTransit += Number(item.orderQuantity || 0);
+      await inventory.save();
+    }
+  }
+  // SCENARIO C: If order status becomes "Received" (from Ordered or On Transit)
+  else if (newStatus === "Received") {
+    // If it was On Transit before, remove old items from onTransit
+    if (currentStatus === "On Transit") {
+      for (const item of oldItems) {
+        let inventory = await InventoryModel.findOne({ product: item.product });
+        if (inventory) {
+          inventory.onTransit = Math.max(0, inventory.onTransit - Number(item.orderQuantity || 0));
+          await inventory.save();
+        }
+      }
+    }
 
-      const oldQty = oldTransitMap.get(String(item.product)) || 0;
-      if (currentStatus === "On Transit" && oldQty > 0) {
-        inventory.onTransit = Math.max(0, inventory.onTransit - oldQty);
+    // Add new items to currentStock
+    for (const item of newItems) {
+      let inventory = await InventoryModel.findOne({ product: item.product });
+      if (!inventory) {
+        inventory = await InventoryModel.create({
+          product: item.product,
+          group: item.group,
+          subGroup: item.subGroup,
+          totalStock: 0,
+          currentStock: 0,
+          onTransit: 0,
+          avgBuyingPrice: 0,
+          totalStockValue: 0,
+        });
       }
 
       const orderQty = Number(item.orderQuantity || 0);
@@ -186,7 +203,7 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
   return result;
 };
 
-// 5. Delete Purchase Order by purchaseId & Revert Inventory
+// 5. Delete Purchase Order
 const deletePurchaseOrderFromDB = async (purchaseId: string) => {
   const existingOrder = await PurchaseOrderModel.findOne({ purchaseId });
 
@@ -198,7 +215,7 @@ const deletePurchaseOrderFromDB = async (purchaseId: string) => {
     for (const item of existingOrder.items) {
       const inventory = await InventoryModel.findOne({ product: item.product });
       if (inventory) {
-        inventory.onTransit = Math.max(0, inventory.onTransit - item.orderQuantity);
+        inventory.onTransit = Math.max(0, inventory.onTransit - Number(item.orderQuantity || 0));
         await inventory.save();
       }
     }
