@@ -1,3 +1,4 @@
+// purchaseOrder.service.ts
 import { PurchaseOrderModel } from "./purchaseOrder.model.js";
 import { InventoryModel } from "../inventory/inventory.model.js";
 
@@ -39,19 +40,27 @@ const createPurchaseOrderIntoDB = async (payload: any) => {
   return result;
 };
 
-// 2. Get All Purchase Orders
+// 2. Get All Purchase Orders (POPULATED FULLY)
 const getAllPurchaseOrdersFromDB = async () => {
-  const result = await PurchaseOrderModel.find().populate("supplierName");
+  const result = await PurchaseOrderModel.find()
+    .populate("supplierName")
+    .populate("items.group")
+    .populate("items.subGroup")
+    .populate("items.product");
   return result;
 };
 
-// 3. Get Single Purchase Order by purchaseId
+// 3. Get Single Purchase Order by purchaseId (POPULATED FULLY)
 const getSinglePurchaseOrderFromDB = async (purchaseId: string) => {
-  const result = await PurchaseOrderModel.findOne({ purchaseId: purchaseId }).populate("supplierName");
+  const result = await PurchaseOrderModel.findOne({ purchaseId: purchaseId })
+    .populate("supplierName")
+    .populate("items.group")
+    .populate("items.subGroup")
+    .populate("items.product");
   return result;
 };
 
-// 4. Update Purchase Order & Handle Inventory (Status transition flow)
+// 4. Update Purchase Order & Handle Inventory
 const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
   const existingOrder = await PurchaseOrderModel.findOne({ purchaseId });
 
@@ -62,12 +71,10 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
   const currentStatus = existingOrder.status;
   const newStatus = payload.status;
 
-  // RULE 1: Ekbar Received hoye gele r kono bhabei edit kora jabe na
   if (currentStatus === "Received") {
     throw new Error("This purchase order has already been received and cannot be edited!");
   }
 
-  // RULE 2: Backward status transition block kora (e.g., Received/On Transit theke Ordered-e jawa jabe na)
   if (newStatus && currentStatus !== newStatus) {
     const statusHierarchy: { [key: string]: number } = {
       "Ordered": 1,
@@ -80,7 +87,6 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
     }
   }
 
-  // RULE 3: Ordered -> On Transit, On Transit -> Received, ba Ordered -> Received transition er upore base kore inventory update
   if (newStatus && currentStatus !== newStatus) {
     for (const item of existingOrder.items) {
       let inventory = await InventoryModel.findOne({ product: item.product });
@@ -130,7 +136,11 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
       new: true,
       runValidators: true,
     }
-  ).populate("supplierName");
+  )
+    .populate("supplierName")
+    .populate("items.group")
+    .populate("items.subGroup")
+    .populate("items.product");
   
   return result;
 };
