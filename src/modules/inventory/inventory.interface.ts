@@ -5,6 +5,9 @@ export type Inventory = {
   group: Types.ObjectId;
   subGroup: Types.ObjectId;
   totalStock: number;
+  purchaseReturn: number;
+  sellReturn: number;
+  lostDamage: number;
   totalSell: number;
   currentStock: number;
   onTransit: number;
