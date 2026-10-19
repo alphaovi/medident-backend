@@ -19,7 +19,23 @@ const getSingleInventory = async (req: Request, res: Response) => {
   }
 };
 
+const updateInventory = async (req: Request, res: Response) => {
+  try {
+    const { productId } = req.params;
+    const result = await InventoryServices.updateInventoryInDB(productId, req.body);
+    
+    if (!result) {
+      return res.status(404).json({ success: false, message: "Inventory not found for this product/id" });
+    }
+
+    res.status(200).json({ success: true, message: "Inventory updated successfully", data: result });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message || "Something went wrong", error });
+  }
+};
+
 export const InventoryControllers = {
   getAllInventories,
   getSingleInventory,
+  updateInventory,
 };
