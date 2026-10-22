@@ -6,11 +6,15 @@ const createPurchaseOrderIntoDB = async (payload: any) => {
   const result = await PurchaseOrderModel.create(payload);
   
   if (result.status === "On Transit" || result.status === "Received") {
-    for (const item of result.items) {
-      let inventory = await InventoryModel.findOne({ product: item.product });
+    const productIds = result.items.map((item: any) => item.product);
+    const inventories = await InventoryModel.find({ product: { $in: productIds } });
+    const invMap = new Map(inventories.map((inv) => [String(inv.product), inv]));
+
+    const inventoryPromises = result.items.map(async (item: any) => {
+      let inventory = invMap.get(String(item.product));
 
       if (!inventory) {
-        inventory = await InventoryModel.create({
+        inventory = new InventoryModel({
           product: item.product,
           group: item.group || null,
           subGroup: item.subGroup || null,
@@ -28,36 +32,37 @@ const createPurchaseOrderIntoDB = async (payload: any) => {
       if (result.status === "On Transit") {
         inventory.onTransit += Number(item.orderQuantity || 0);
       } else if (result.status === "Received") {
-        inventory.currentStock += Number(item.orderQuantity || 0);
-        inventory.totalStock += Number(item.orderQuantity || 0);
+        const orderQty = Number(item.orderQuantity || 0);
+        inventory.currentStock += orderQty;
+        inventory.totalStock += orderQty;
 
-        const newTotalStockValue = inventory.totalStockValue + (Number(item.orderQuantity || 0) * Number(item.unitCost || 0));
+        const newTotalStockValue = inventory.totalStockValue + (orderQty * Number(item.unitCost || 0));
         inventory.totalStockValue = newTotalStockValue;
         inventory.avgBuyingPrice = inventory.totalStock > 0 ? newTotalStockValue / inventory.totalStock : 0;
       }
-      await inventory.save();
-    }
+      return inventory.save();
+    });
+
+    await Promise.all(inventoryPromises);
   }
 
   return result;
 };
 
 const getAllPurchaseOrdersFromDB = async () => {
-  const result = await PurchaseOrderModel.find()
+  return await PurchaseOrderModel.find()
     .populate("supplierName")
     .populate("items.group")
     .populate("items.subGroup")
     .populate("items.product");
-  return result;
 };
 
 const getSinglePurchaseOrderFromDB = async (purchaseId: string) => {
-  const result = await PurchaseOrderModel.findOne({ purchaseId: purchaseId })
+  return await PurchaseOrderModel.findOne({ purchaseId: purchaseId })
     .populate("supplierName")
     .populate("items.group")
     .populate("items.subGroup")
     .populate("items.product");
-  return result;
 };
 
 const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
@@ -89,6 +94,18 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
   const oldItems = existingOrder.items || [];
   const newItems = payload.items || oldItems;
 
+  const allProductIds = Array.from(
+    new Set([
+      ...oldItems.map((i: any) => String(i.product)),
+      ...newItems.map((i: any) => String(i.product)),
+    ])
+  );
+
+  const inventories = await InventoryModel.find({ product: { $in: allProductIds } });
+  const inventoryMap = new Map(inventories.map((inv) => [String(inv.product), inv]));
+
+  const inventoriesToSave: any[] = [];
+
   if (currentStatus === "On Transit" && newStatus === "On Transit") {
     const oldMap = new Map<string, number>();
     oldItems.forEach((i: any) => oldMap.set(String(i.product), (oldMap.get(String(i.product)) || 0) + Number(i.orderQuantity || 0)));
@@ -96,19 +113,17 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
     const newMap = new Map<string, number>();
     newItems.forEach((i: any) => newMap.set(String(i.product), (newMap.get(String(i.product)) || 0) + Number(i.orderQuantity || 0)));
 
-    const allProds = new Set([...oldMap.keys(), ...newMap.keys()]);
-
-    for (const prodId of allProds) {
+    for (const prodId of allProductIds) {
       const oldQty = oldMap.get(prodId) || 0;
       const newQty = newMap.get(prodId) || 0;
       const diff = newQty - oldQty;
 
       if (diff !== 0) {
-        let inventory = await InventoryModel.findOne({ product: prodId });
+        let inventory = inventoryMap.get(prodId);
         const sample = [...oldItems, ...newItems].find((i: any) => String(i.product) === prodId);
-        
+
         if (!inventory) {
-          inventory = await InventoryModel.create({
+          inventory = new InventoryModel({
             product: prodId,
             group: sample?.group || null,
             subGroup: sample?.subGroup || null,
@@ -118,19 +133,22 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
             avgBuyingPrice: 0,
             totalStockValue: 0,
           });
+          inventoryMap.set(prodId, inventory);
         } else {
           if (!inventory.group && sample?.group) inventory.group = sample.group;
           if (!inventory.subGroup && sample?.subGroup) inventory.subGroup = sample.subGroup;
         }
         inventory.onTransit = Math.max(0, inventory.onTransit + diff);
-        await inventory.save();
+        inventoriesToSave.push(inventory);
       }
     }
   } else if (currentStatus === "Ordered" && newStatus === "On Transit") {
     for (const item of newItems) {
-      let inventory = await InventoryModel.findOne({ product: item.product });
+      const prodId = String(item.product);
+      let inventory = inventoryMap.get(prodId);
+
       if (!inventory) {
-        inventory = await InventoryModel.create({
+        inventory = new InventoryModel({
           product: item.product,
           group: item.group || null,
           subGroup: item.subGroup || null,
@@ -140,28 +158,32 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
           avgBuyingPrice: 0,
           totalStockValue: 0,
         });
+        inventoryMap.set(prodId, inventory);
       } else {
         if (!inventory.group && item.group) inventory.group = item.group;
         if (!inventory.subGroup && item.subGroup) inventory.subGroup = item.subGroup;
       }
       inventory.onTransit += Number(item.orderQuantity || 0);
-      await inventory.save();
+      inventoriesToSave.push(inventory);
     }
   } else if (newStatus === "Received") {
     if (currentStatus === "On Transit") {
       for (const item of oldItems) {
-        let inventory = await InventoryModel.findOne({ product: item.product });
+        const prodId = String(item.product);
+        const inventory = inventoryMap.get(prodId);
         if (inventory) {
           inventory.onTransit = Math.max(0, inventory.onTransit - Number(item.orderQuantity || 0));
-          await inventory.save();
+          inventoriesToSave.push(inventory);
         }
       }
     }
 
     for (const item of newItems) {
-      let inventory = await InventoryModel.findOne({ product: item.product });
+      const prodId = String(item.product);
+      let inventory = inventoryMap.get(prodId);
+
       if (!inventory) {
-        inventory = await InventoryModel.create({
+        inventory = new InventoryModel({
           product: item.product,
           group: item.group || null,
           subGroup: item.subGroup || null,
@@ -171,6 +193,7 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
           avgBuyingPrice: 0,
           totalStockValue: 0,
         });
+        inventoryMap.set(prodId, inventory);
       } else {
         if (!inventory.group && item.group) inventory.group = item.group;
         if (!inventory.subGroup && item.subGroup) inventory.subGroup = item.subGroup;
@@ -184,8 +207,13 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
       inventory.totalStockValue = newTotalStockValue;
       inventory.avgBuyingPrice = inventory.totalStock > 0 ? newTotalStockValue / inventory.totalStock : 0;
 
-      await inventory.save();
+      inventoriesToSave.push(inventory);
     }
+  }
+
+  if (inventoriesToSave.length > 0) {
+    const uniqueInventories = Array.from(new Set(inventoriesToSave));
+    await Promise.all(uniqueInventories.map((inv) => inv.save()));
   }
 
   const result = await PurchaseOrderModel.findOneAndUpdate(
@@ -212,12 +240,20 @@ const deletePurchaseOrderFromDB = async (purchaseId: string) => {
   }
 
   if (existingOrder.status === "On Transit") {
+    const productIds = existingOrder.items.map((i: any) => i.product);
+    const inventories = await InventoryModel.find({ product: { $in: productIds } });
+    const inventoryMap = new Map(inventories.map((inv) => [String(inv.product), inv]));
+
+    const inventoriesToSave = [];
     for (const item of existingOrder.items) {
-      const inventory = await InventoryModel.findOne({ product: item.product });
+      const inventory = inventoryMap.get(String(item.product));
       if (inventory) {
         inventory.onTransit = Math.max(0, inventory.onTransit - Number(item.orderQuantity || 0));
-        await inventory.save();
+        inventoriesToSave.push(inventory);
       }
+    }
+    if (inventoriesToSave.length > 0) {
+      await Promise.all(inventoriesToSave.map((inv) => inv.save()));
     }
   }
 
