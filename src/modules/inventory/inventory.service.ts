@@ -1,10 +1,12 @@
+// inventory.service.ts
 import { InventoryModel } from "./inventory.model.js";
 
 const getAllInventoriesFromDB = async () => {
   return await InventoryModel.find()
     .populate("product")
     .populate("group")
-    .populate("subGroup");
+    .populate("subGroup")
+    .lean();
 };
 
 const getSingleInventoryFromDB = async (id: string) => {
@@ -13,14 +15,16 @@ const getSingleInventoryFromDB = async (id: string) => {
     inventory = await InventoryModel.findById(id)
       .populate("product")
       .populate("group")
-      .populate("subGroup");
+      .populate("subGroup")
+      .lean();
   }
 
   if (!inventory) {
     inventory = await InventoryModel.findOne({ product: id })
       .populate("product")
       .populate("group")
-      .populate("subGroup");
+      .populate("subGroup")
+      .lean();
   }
 
   return inventory;
@@ -29,7 +33,6 @@ const getSingleInventoryFromDB = async (id: string) => {
 const updateInventoryInDB = async (id: string, payload: any) => {
   let inventory = null;
 
-  // 1. Try finding by Inventory ID or Product ID
   if (id.match(/^[0-9a-fA-F]{24}$/)) {
     inventory = await InventoryModel.findById(id);
   }
@@ -38,7 +41,6 @@ const updateInventoryInDB = async (id: string, payload: any) => {
     inventory = await InventoryModel.findOne({ product: id });
   }
 
-  // If purchase order passes specific item additions for average calculation
   if (payload.incomingQty !== undefined && payload.incomingUnitCost !== undefined) {
     const currentStock = inventory?.currentStock || 0;
     const oldAvgPrice = inventory?.avgBuyingPrice || 0;
@@ -58,21 +60,32 @@ const updateInventoryInDB = async (id: string, payload: any) => {
     delete payload.incomingUnitCost;
   }
 
-  // Perform Update
+  const updateData: any = {};
+  const fields = [
+    "totalStock", "purchaseReturn", "sellReturn", "lostDamage", 
+    "totalSell", "currentStock", "onTransit", "damaged", "lost", 
+    "freeSample", "avgBuyingPrice", "totalStockValue", "totalSaleValue"
+  ];
+
+  fields.forEach((field) => {
+    if (payload[field] !== undefined) {
+      updateData[field] = Number(payload[field]) || 0;
+    }
+  });
+
   if (inventory) {
     return await InventoryModel.findByIdAndUpdate(
       inventory._id,
-      { $set: payload },
+      { $set: updateData },
       { new: true, runValidators: true }
     )
       .populate("product")
       .populate("group")
       .populate("subGroup");
   } else {
-    // If inventory doesn't exist yet, upsert by product ID
     return await InventoryModel.findOneAndUpdate(
       { product: id },
-      { $set: payload },
+      { $set: updateData },
       { new: true, upsert: true, runValidators: true }
     )
       .populate("product")
