@@ -1,7 +1,10 @@
+// inventory.validation.ts
 import { z } from "zod";
 
 const updateInventoryZodSchema = z.object({
   body: z.object({
+    group: z.string().optional(),
+    subGroup: z.string().optional(),
     totalStock: z.number().min(0, "Total stock cannot be negative").optional(),
     purchaseReturn: z.number().min(0, "Purchase return cannot be negative").optional(),
     sellReturn: z.number().min(0, "Sell return cannot be negative").optional(),
