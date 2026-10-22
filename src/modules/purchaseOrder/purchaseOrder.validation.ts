@@ -1,6 +1,6 @@
-// purchaseOrder.validation.ts
 import { z } from "zod";
 
+// Create er jonno item schema (ekhane required thakbe)
 const purchaseOrderItemValidationSchema = z.object({
   group: z.string({ required_error: "Group is required" }),
   subGroup: z.string({ required_error: "SubGroup is required" }),
@@ -17,6 +17,25 @@ const purchaseOrderItemValidationSchema = z.object({
   unitCost: z.number({ required_error: "Unit cost is required" }),
   totalCost: z.number({ required_error: "Total cost is required" }),
   status: z.enum(["Ordered", "On Transit", "Received"]).default("Ordered"),
+});
+
+// Update er jonno item schema - ekhane group ebong subGroup ke .optional() kore dewa hoyeche jate partial update korleo error na ase
+const updatePurchaseOrderItemValidationSchema = z.object({
+  group: z.string().optional(),
+  subGroup: z.string().optional(),
+  product: z.string().optional(),
+  currentStock: z.number().optional(),
+  inTransit: z.number().optional(),
+  orderQuantity: z.number().optional(),
+  price: z.number().optional(),
+  weight: z.number().optional(),
+  shippingCost: z.number().optional(),
+  vatAmount: z.number().optional(),
+  transitCost: z.number().optional(),
+  otherCost: z.number().optional(),
+  unitCost: z.number().optional(),
+  totalCost: z.number().optional(),
+  status: z.enum(["Ordered", "On Transit", "Received"]).optional(),
 });
 
 const createPurchaseOrderZodSchema = z.object({
@@ -44,7 +63,8 @@ const updatePurchaseOrderZodSchema = z.object({
     purchaseDate: z.string().optional().transform((val) => (val ? new Date(val) : undefined)),
     expectedDeliveryDate: z.string().optional().transform((val) => (val ? new Date(val) : undefined)),
     supplierName: z.string().optional(),
-    items: z.array(purchaseOrderItemValidationSchema).optional(),
+    // Ekhane updatePurchaseOrderItemValidationSchema use kora hoyeche
+    items: z.array(updatePurchaseOrderItemValidationSchema).optional(),
     shippingCost: z.number().optional(),
     transitCost: z.number().optional(),
     vatType: z.enum(["%", "flat"]).optional(),
