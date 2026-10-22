@@ -51,10 +51,11 @@ const createPurchaseOrderIntoDB = async (payload: any) => {
 
 const getAllPurchaseOrdersFromDB = async () => {
   return await PurchaseOrderModel.find()
-    .populate("supplierName")
+    .populate("supplierName", "supplierName name")
     .populate("items.group")
     .populate("items.subGroup")
-    .populate("items.product");
+    .populate("items.product", "productName name")
+    .lean();
 };
 
 const getSinglePurchaseOrderFromDB = async (purchaseId: string) => {
@@ -62,7 +63,8 @@ const getSinglePurchaseOrderFromDB = async (purchaseId: string) => {
     .populate("supplierName")
     .populate("items.group")
     .populate("items.subGroup")
-    .populate("items.product");
+    .populate("items.product")
+    .lean();
 };
 
 const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
