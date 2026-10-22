@@ -81,7 +81,12 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
     throw new Error("This purchase order has already been received and cannot be edited!");
   }
 
+  // Strict Sequential Status Validation (Ordered ➔ On Transit ➔ Received)
   if (newStatus && currentStatus !== newStatus) {
+    if (currentStatus === "Ordered" && newStatus === "Received") {
+      throw new Error("Invalid transition! You must move the order to 'On Transit' before marking it as 'Received'.");
+    }
+
     const statusHierarchy: { [key: string]: number } = {
       "Ordered": 1,
       "On Transit": 2,
