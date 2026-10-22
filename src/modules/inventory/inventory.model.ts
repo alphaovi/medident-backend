@@ -1,10 +1,11 @@
+// inventory.model.ts
 import { Schema, model } from "mongoose";
 
 const inventorySchema = new Schema(
   {
     product: { type: Schema.Types.ObjectId, ref: "Product", required: true, unique: true },
-    group: { type: Schema.Types.ObjectId, ref: "ProductGroup", required: true },
-    subGroup: { type: Schema.Types.ObjectId, ref: "ProductSubgroup", required: true },
+    group: { type: Schema.Types.ObjectId, ref: "ProductGroup", required: false },
+    subGroup: { type: Schema.Types.ObjectId, ref: "ProductSubgroup", required: false },
     totalStock: { type: Number, default: 0 },
     purchaseReturn: { type: Number, default: 0 },
     sellReturn: { type: Number, default: 0 },

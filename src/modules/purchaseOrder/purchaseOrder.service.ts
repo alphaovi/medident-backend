@@ -2,7 +2,6 @@
 import { PurchaseOrderModel } from "./purchaseOrder.model.js";
 import { InventoryModel } from "../inventory/inventory.model.js";
 
-// 1. Create Purchase Order
 const createPurchaseOrderIntoDB = async (payload: any) => {
   const result = await PurchaseOrderModel.create(payload);
   
@@ -13,14 +12,17 @@ const createPurchaseOrderIntoDB = async (payload: any) => {
       if (!inventory) {
         inventory = await InventoryModel.create({
           product: item.product,
-          group: item.group,
-          subGroup: item.subGroup,
+          group: item.group || null,
+          subGroup: item.subGroup || null,
           totalStock: 0,
           currentStock: 0,
           onTransit: 0,
           avgBuyingPrice: 0,
           totalStockValue: 0,
         });
+      } else {
+        if (!inventory.group && item.group) inventory.group = item.group;
+        if (!inventory.subGroup && item.subGroup) inventory.subGroup = item.subGroup;
       }
 
       if (result.status === "On Transit") {
@@ -40,7 +42,6 @@ const createPurchaseOrderIntoDB = async (payload: any) => {
   return result;
 };
 
-// 2. Get All Purchase Orders
 const getAllPurchaseOrdersFromDB = async () => {
   const result = await PurchaseOrderModel.find()
     .populate("supplierName")
@@ -50,7 +51,6 @@ const getAllPurchaseOrdersFromDB = async () => {
   return result;
 };
 
-// 3. Get Single Purchase Order
 const getSinglePurchaseOrderFromDB = async (purchaseId: string) => {
   const result = await PurchaseOrderModel.findOne({ purchaseId: purchaseId })
     .populate("supplierName")
@@ -60,7 +60,6 @@ const getSinglePurchaseOrderFromDB = async (purchaseId: string) => {
   return result;
 };
 
-// 4. Update Purchase Order & Handle Inventory Accurately
 const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
   const existingOrder = await PurchaseOrderModel.findOne({ purchaseId });
 
@@ -90,7 +89,6 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
   const oldItems = existingOrder.items || [];
   const newItems = payload.items || oldItems;
 
-  // SCENARIO A: If order was "On Transit" and is STILL "On Transit", update inventory based on net difference
   if (currentStatus === "On Transit" && newStatus === "On Transit") {
     const oldMap = new Map<string, number>();
     oldItems.forEach((i: any) => oldMap.set(String(i.product), (oldMap.get(String(i.product)) || 0) + Number(i.orderQuantity || 0)));
@@ -107,47 +105,49 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
 
       if (diff !== 0) {
         let inventory = await InventoryModel.findOne({ product: prodId });
+        const sample = [...oldItems, ...newItems].find((i: any) => String(i.product) === prodId);
+        
         if (!inventory) {
-          const sample = [...oldItems, ...newItems].find((i: any) => String(i.product) === prodId);
           inventory = await InventoryModel.create({
             product: prodId,
-            group: sample?.group,
-            subGroup: sample?.subGroup,
+            group: sample?.group || null,
+            subGroup: sample?.subGroup || null,
             totalStock: 0,
             currentStock: 0,
             onTransit: 0,
             avgBuyingPrice: 0,
             totalStockValue: 0,
           });
+        } else {
+          if (!inventory.group && sample?.group) inventory.group = sample.group;
+          if (!inventory.subGroup && sample?.subGroup) inventory.subGroup = sample.subGroup;
         }
         inventory.onTransit = Math.max(0, inventory.onTransit + diff);
         await inventory.save();
       }
     }
-  }
-  // SCENARIO B: If order was "Ordered" and is now updated to "On Transit"
-  else if (currentStatus === "Ordered" && newStatus === "On Transit") {
+  } else if (currentStatus === "Ordered" && newStatus === "On Transit") {
     for (const item of newItems) {
       let inventory = await InventoryModel.findOne({ product: item.product });
       if (!inventory) {
         inventory = await InventoryModel.create({
           product: item.product,
-          group: item.group,
-          subGroup: item.subGroup,
+          group: item.group || null,
+          subGroup: item.subGroup || null,
           totalStock: 0,
           currentStock: 0,
           onTransit: 0,
           avgBuyingPrice: 0,
           totalStockValue: 0,
         });
+      } else {
+        if (!inventory.group && item.group) inventory.group = item.group;
+        if (!inventory.subGroup && item.subGroup) inventory.subGroup = item.subGroup;
       }
       inventory.onTransit += Number(item.orderQuantity || 0);
       await inventory.save();
     }
-  }
-  // SCENARIO C: If order status becomes "Received" (from Ordered or On Transit)
-  else if (newStatus === "Received") {
-    // If it was On Transit before, remove old items from onTransit
+  } else if (newStatus === "Received") {
     if (currentStatus === "On Transit") {
       for (const item of oldItems) {
         let inventory = await InventoryModel.findOne({ product: item.product });
@@ -158,20 +158,22 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
       }
     }
 
-    // Add new items to currentStock
     for (const item of newItems) {
       let inventory = await InventoryModel.findOne({ product: item.product });
       if (!inventory) {
         inventory = await InventoryModel.create({
           product: item.product,
-          group: item.group,
-          subGroup: item.subGroup,
+          group: item.group || null,
+          subGroup: item.subGroup || null,
           totalStock: 0,
           currentStock: 0,
           onTransit: 0,
           avgBuyingPrice: 0,
           totalStockValue: 0,
         });
+      } else {
+        if (!inventory.group && item.group) inventory.group = item.group;
+        if (!inventory.subGroup && item.subGroup) inventory.subGroup = item.subGroup;
       }
 
       const orderQty = Number(item.orderQuantity || 0);
@@ -186,7 +188,6 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
     }
   }
 
-  // Update Purchase Order in DB
   const result = await PurchaseOrderModel.findOneAndUpdate(
     { purchaseId: purchaseId },
     payload,
@@ -203,7 +204,6 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
   return result;
 };
 
-// 5. Delete Purchase Order
 const deletePurchaseOrderFromDB = async (purchaseId: string) => {
   const existingOrder = await PurchaseOrderModel.findOne({ purchaseId });
 
