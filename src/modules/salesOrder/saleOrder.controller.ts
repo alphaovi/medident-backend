@@ -69,6 +69,27 @@ const getSaleOrder = async (req: Request, res: Response) => {
   }
 };
 
+const updateSaleOrder = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { saleOrder } = req.body;
+    const result = await SaleOrderServices.updateSaleOrderIntoDB(id, saleOrder);
+
+    res.status(200).json({
+      success: true,
+      message: "Sale order updated successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong",
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+};
+
 const updateOrderStatus = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -115,6 +136,7 @@ export const SaleOrderControllers = {
   createSaleOrder,
   getAllSaleOrders,
   getSaleOrder,
+  updateSaleOrder,
   updateOrderStatus,
   deleteSaleOrder,
 };

@@ -21,6 +21,12 @@ router.get("/", SaleOrderControllers.getAllSaleOrders);
 // Get Single Sale Order by ID
 router.get("/:id", SaleOrderControllers.getSaleOrder);
 
+// Update Full Sale Order using PATCH
+router.patch(
+  "/:id",
+  SaleOrderControllers.updateSaleOrder
+);
+
 // Update Sale Order Status (Patch)
 router.patch(
   "/:id/status",
