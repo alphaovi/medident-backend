@@ -1,3 +1,5 @@
+// src/app/modules/salesOrder/salesOrder.service.ts
+
 import mongoose from "mongoose";
 import { ProductModel } from "../product/product.model.js";
 import { CustomerModel } from "../customers/customer.model.js";
@@ -114,7 +116,15 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
     const existingOrder = await SaleOrderModel.findById(id).session(session);
     if (!existingOrder) throw new Error("Sale order not found");
 
-    // Restore old inventory stock
+    // 1. Resolve Customer safely
+    const customerQuery = mongoose.Types.ObjectId.isValid(payload.customer)
+      ? { $or: [{ id: payload.customer }, { _id: payload.customer }] }
+      : { id: payload.customer };
+
+    const customer = await CustomerModel.findOne(customerQuery).session(session);
+    if (!customer) throw new Error(`Customer not found: ${payload.customer}`);
+
+    // 2. Restore old inventory stock
     for (const item of existingOrder.products) {
       const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
       if (inventory) {
@@ -128,8 +138,13 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
     let productsSubtotal = 0;
     const calculatedProducts = [];
 
+    // 3. Process new products safely with query fallback
     for (const item of payload.products) {
-      const product = await ProductModel.findById(item.product).session(session);
+      const productQuery = mongoose.Types.ObjectId.isValid(item.product)
+        ? { $or: [{ id: item.product }, { _id: item.product }] }
+        : { id: item.product };
+
+      const product = await ProductModel.findOne(productQuery).session(session);
       if (!product) throw new Error(`Product not found: ${item.product}`);
 
       const inventory = await InventoryModel.findOne({ product: product._id }).session(session);
@@ -169,14 +184,27 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
 
     const dueAmount = roundNumber(grandTotal - payload.paidAmount);
 
-    // Deduct new inventory stock
+    // 4. Deduct new inventory stock
     for (const item of calculatedProducts) {
       const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
       if (inventory) {
-        inventory.currentStock -= item.quantity;
-        inventory.totalStock = Math.max(0, inventory.totalStock - item.quantity);
-        inventory.totalSell = (inventory.totalSell || 0) + item.quantity;
-        await inventory.save({ session });
+        const updatedCurrentStock = inventory.currentStock - item.quantity;
+        const updatedTotalSell = (inventory.totalSell || 0) + item.quantity;
+        const updatedTotalStock = Math.max(0, inventory.totalStock - item.quantity);
+
+        await InventoryModel.findOneAndUpdate(
+          { product: item.product },
+          {
+            $set: {
+              currentStock: updatedCurrentStock,
+              totalStock: updatedTotalStock,
+              totalSell: updatedTotalSell,
+              totalStockValue: Number((updatedCurrentStock * inventory.avgBuyingPrice).toFixed(2)),
+              totalSaleValue: Number(((inventory.totalSaleValue || 0) + item.afterDiscount).toFixed(2)),
+            },
+          },
+          { session }
+        );
       }
     }
 
@@ -184,6 +212,7 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
       id,
       {
         ...payload,
+        customer: customer._id,
         products: calculatedProducts,
         grandTotal,
         dueAmount,
