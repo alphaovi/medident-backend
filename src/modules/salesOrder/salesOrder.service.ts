@@ -1,3 +1,5 @@
+// src/app/modules/salesOrder/salesOrder.service.ts
+
 import mongoose from "mongoose";
 import { ProductModel } from "../product/product.model.js";
 import { CustomerModel } from "../customers/customer.model.js";
@@ -68,7 +70,6 @@ const createSaleOrderIntoDB = async (payload: any) => {
 
     const dueAmount = roundNumber(grandTotal - payload.paidAmount);
 
-    // Auto-populate payments array if not provided explicitly but paidAmount > 0
     let payments = payload.payments || [];
     if (payments.length === 0 && payload.paidAmount > 0) {
       payments = [
@@ -197,8 +198,6 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
     }
 
     const dueAmount = roundNumber(grandTotal - payload.paidAmount);
-
-    // Keep existing payments or update based on payload
     let payments = payload.payments || existingOrder.payments;
 
     for (const item of calculatedProducts) {
