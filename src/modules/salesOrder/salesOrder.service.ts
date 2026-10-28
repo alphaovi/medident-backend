@@ -42,8 +42,8 @@ const createSaleOrderIntoDB = async (payload: any) => {
 
       const price = product.sellingPrice;
       const totalPrice = roundNumber(price * item.quantity);
-      const itemDiscount = roundNumber(item.discount ?? 0);
-      const afterDiscount = roundNumber(totalPrice - itemDiscount);
+      const itemDiscount = roundNumber(Number(item.discount) || 0);
+      const afterDiscount = roundNumber(Math.max(0, totalPrice - itemDiscount));
 
       productsSubtotal = roundNumber(productsSubtotal + afterDiscount);
 
@@ -124,7 +124,7 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
     const customer = await CustomerModel.findOne(customerQuery).session(session);
     if (!customer) throw new Error(`Customer not found: ${payload.customer}`);
 
-    // 2. Restore old inventory stock
+    // 2. Restore old inventory stock safely
     for (const item of existingOrder.products) {
       const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
       if (inventory) {
@@ -138,7 +138,7 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
     let productsSubtotal = 0;
     const calculatedProducts = [];
 
-    // 3. Process new products safely with query fallback
+    // 3. Process new products and check available stock
     for (const item of payload.products) {
       const productQuery = mongoose.Types.ObjectId.isValid(item.product)
         ? { $or: [{ id: item.product }, { _id: item.product }] }
@@ -156,8 +156,8 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
 
       const price = product.sellingPrice;
       const totalPrice = roundNumber(price * item.quantity);
-      const itemDiscount = roundNumber(item.discount ?? 0);
-      const afterDiscount = roundNumber(totalPrice - itemDiscount);
+      const itemDiscount = roundNumber(Number(item.discount) || 0);
+      const afterDiscount = roundNumber(Math.max(0, totalPrice - itemDiscount));
 
       productsSubtotal = roundNumber(productsSubtotal + afterDiscount);
 
@@ -184,7 +184,7 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
 
     const dueAmount = roundNumber(grandTotal - payload.paidAmount);
 
-    // 4. Deduct new inventory stock
+    // 4. Deduct new inventory stock safely
     for (const item of calculatedProducts) {
       const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
       if (inventory) {
