@@ -1,5 +1,5 @@
 import { Schema, model } from "mongoose";
-import { OrderItem, SaleOrder } from "./salesOrder.interface.js";
+import { OrderItem, PaymentRecord, SaleOrder } from "./salesOrder.interface.js";
 
 const orderItemSchema = new Schema<OrderItem>(
   {
@@ -11,6 +11,14 @@ const orderItemSchema = new Schema<OrderItem>(
     discount: { type: Number, default: 0, min: 0 },
     totalPrice: { type: Number, required: true, min: 0 },
     afterDiscount: { type: Number, required: true, min: 0 },
+  },
+  { _id: false }
+);
+
+const paymentSchema = new Schema<PaymentRecord>(
+  {
+    amount: { type: Number, required: true, min: 0 },
+    date: { type: Date, required: true, default: Date.now },
   },
   { _id: false }
 );
@@ -31,6 +39,7 @@ const saleOrderSchema = new Schema<SaleOrder>(
     generalDiscountType: { type: String, enum: ["%", "flat"] },
     generalDiscountValue: { type: Number, default: 0, min: 0 },
     paidAmount: { type: Number, required: true, min: 0 },
+    payments: { type: [paymentSchema], default: [] },
     grandTotal: { type: Number, required: true, min: 0 },
     dueAmount: { type: Number, required: true, min: 0 },
     status: {

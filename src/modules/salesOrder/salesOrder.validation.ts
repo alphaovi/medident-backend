@@ -8,6 +8,12 @@ const orderItemValidationSchema = z.object({
   discount: z.number({ required_error: "Discount must be a number" }).min(0, "Discount cannot be negative").optional(),
 });
 
+// Payment validation schema
+const paymentValidationSchema = z.object({
+  amount: z.number({ required_error: "Payment amount must be a number" }).min(0, "Amount cannot be negative"),
+  date: z.union([z.string().min(1, "Date is required"), z.date()]).optional(),
+});
+
 export const createSaleOrderValidationSchema = z.object({
   body: z.object({
     saleOrder: z.object({
@@ -18,6 +24,7 @@ export const createSaleOrderValidationSchema = z.object({
       generalDiscountType: z.enum(["%", "flat"]).optional(),
       generalDiscountValue: z.number({ required_error: "General discount must be a number" }).min(0, "General discount cannot be negative").optional(),
       paidAmount: z.number({ required_error: "Paid amount must be a number" }).min(0, "Paid amount cannot be negative"),
+      payments: z.array(paymentValidationSchema).optional(), // <-- Optional ba required rakhte paro
       status: z.enum(["pending", "approved", "delivered"]).optional(),
     }),
   }),

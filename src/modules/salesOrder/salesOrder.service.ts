@@ -1,5 +1,3 @@
-// src/app/modules/salesOrder/salesOrder.service.ts
-
 import mongoose from "mongoose";
 import { ProductModel } from "../product/product.model.js";
 import { CustomerModel } from "../customers/customer.model.js";
@@ -70,8 +68,27 @@ const createSaleOrderIntoDB = async (payload: any) => {
 
     const dueAmount = roundNumber(grandTotal - payload.paidAmount);
 
+    // Auto-populate payments array if not provided explicitly but paidAmount > 0
+    let payments = payload.payments || [];
+    if (payments.length === 0 && payload.paidAmount > 0) {
+      payments = [
+        {
+          amount: payload.paidAmount,
+          date: payload.orderDate || new Date(),
+        },
+      ];
+    }
+
     const createdOrder = await SaleOrderModel.create(
-      [{ ...payload, customer: customer._id, products: calculatedProducts, grandTotal, dueAmount, status: payload.status || "pending" }],
+      [{ 
+        ...payload, 
+        customer: customer._id, 
+        products: calculatedProducts, 
+        grandTotal, 
+        dueAmount, 
+        payments, 
+        status: payload.status || "pending" 
+      }],
       { session }
     );
 
@@ -116,7 +133,6 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
     const existingOrder = await SaleOrderModel.findById(id).session(session);
     if (!existingOrder) throw new Error("Sale order not found");
 
-    // 1. Resolve Customer safely
     const customerQuery = mongoose.Types.ObjectId.isValid(payload.customer)
       ? { $or: [{ id: payload.customer }, { _id: payload.customer }] }
       : { id: payload.customer };
@@ -124,7 +140,6 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
     const customer = await CustomerModel.findOne(customerQuery).session(session);
     if (!customer) throw new Error(`Customer not found: ${payload.customer}`);
 
-    // 2. Restore old inventory stock safely
     for (const item of existingOrder.products) {
       const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
       if (inventory) {
@@ -138,7 +153,6 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
     let productsSubtotal = 0;
     const calculatedProducts = [];
 
-    // 3. Process new products and check available stock
     for (const item of payload.products) {
       const productQuery = mongoose.Types.ObjectId.isValid(item.product)
         ? { $or: [{ id: item.product }, { _id: item.product }] }
@@ -184,7 +198,9 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
 
     const dueAmount = roundNumber(grandTotal - payload.paidAmount);
 
-    // 4. Deduct new inventory stock safely
+    // Keep existing payments or update based on payload
+    let payments = payload.payments || existingOrder.payments;
+
     for (const item of calculatedProducts) {
       const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
       if (inventory) {
@@ -216,6 +232,7 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
         products: calculatedProducts,
         grandTotal,
         dueAmount,
+        payments,
       },
       { new: true, session }
     );
