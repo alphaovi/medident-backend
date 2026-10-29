@@ -1,5 +1,3 @@
-// src/app/modules/salesOrder/salesOrder.service.ts
-
 import mongoose from "mongoose";
 import { ProductModel } from "../product/product.model.js";
 import { CustomerModel } from "../customers/customer.model.js";
@@ -96,9 +94,12 @@ const createSaleOrderIntoDB = async (payload: any) => {
     for (const item of calculatedProducts) {
       const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
       if (inventory) {
-        const updatedCurrentStock = inventory.currentStock - item.quantity;
         const updatedTotalSell = (inventory.totalSell || 0) + item.quantity;
         const updatedTotalStock = Math.max(0, inventory.totalStock - item.quantity);
+        const updatedCurrentStock = Math.max(
+          0,
+          updatedTotalStock - updatedTotalSell - (inventory.lostDamage || 0) - (inventory.damaged || 0) - (inventory.lost || 0) - (inventory.freeSample || 0)
+        );
 
         await InventoryModel.findOneAndUpdate(
           { product: item.product },
@@ -144,9 +145,12 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
     for (const item of existingOrder.products) {
       const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
       if (inventory) {
-        inventory.currentStock += item.quantity;
         inventory.totalStock += item.quantity;
         inventory.totalSell = Math.max(0, (inventory.totalSell || 0) - item.quantity);
+        inventory.currentStock = Math.max(
+          0,
+          inventory.totalStock - inventory.totalSell - (inventory.lostDamage || 0) - (inventory.damaged || 0) - (inventory.lost || 0) - (inventory.freeSample || 0)
+        );
         await inventory.save({ session });
       }
     }
@@ -203,9 +207,12 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
     for (const item of calculatedProducts) {
       const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
       if (inventory) {
-        const updatedCurrentStock = inventory.currentStock - item.quantity;
         const updatedTotalSell = (inventory.totalSell || 0) + item.quantity;
         const updatedTotalStock = Math.max(0, inventory.totalStock - item.quantity);
+        const updatedCurrentStock = Math.max(
+          0,
+          updatedTotalStock - updatedTotalSell - (inventory.lostDamage || 0) - (inventory.damaged || 0) - (inventory.lost || 0) - (inventory.freeSample || 0)
+        );
 
         await InventoryModel.findOneAndUpdate(
           { product: item.product },
@@ -281,9 +288,12 @@ const deleteSaleOrderFromDB = async (id: string) => {
     for (const item of order.products) {
       const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
       if (inventory) {
-        inventory.currentStock += item.quantity;
         inventory.totalStock += item.quantity;
         inventory.totalSell = Math.max(0, (inventory.totalSell || 0) - item.quantity);
+        inventory.currentStock = Math.max(
+          0,
+          inventory.totalStock - inventory.totalSell - (inventory.lostDamage || 0) - (inventory.damaged || 0) - (inventory.lost || 0) - (inventory.freeSample || 0)
+        );
         await inventory.save({ session });
       }
     }
