@@ -50,7 +50,7 @@ app.use("/api/v1/sale-orders", saleOrderRoutes);
 app.use("/api/v1/inventory", InventoryRoutes);
 app.use("/api/v1/purchase-orders", PurchaseOrderRoutes);
 app.use("/api/v1/suppliers", supplierRoutes);
-app.use("/api/v1/stock-adjustment", stockAdjustmentRoutes);
+app.use("/api/v1/stock-adjustments", stockAdjustmentRoutes);
 app.use("/api/v1/states", StateRoutes);
 
 const getAController = (req: Request, res: Response) => {
