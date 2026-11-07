@@ -1,3 +1,4 @@
+// src/app/modules/stockAdjustment/stockAdjustment.service.ts
 import mongoose from "mongoose";
 import { StockAdjustmentModel } from "./stockAdjustment.model.js";
 import { InventoryModel } from "../inventory/inventory.model.js";
@@ -27,7 +28,8 @@ const createStockAdjustmentIntoDB = async (payload: any) => {
       totalStockValue: Number((updatedCurrentStock * inventory.avgBuyingPrice).toFixed(2)),
     };
 
-    if (payload.adjustmentType === "Damaged") {
+    // --- এখানে "Damage" এবং "Damaged" উভয়টিই হ্যান্ডেল করার জন্য ঠিক করা হলো ---
+    if (payload.adjustmentType === "Damaged" || payload.adjustmentType === "Damage") {
       updateFields.damaged = (inventory.damaged || 0) + payload.quantity;
     } else if (payload.adjustmentType === "Lost") {
       updateFields.lost = (inventory.lost || 0) + payload.quantity;
@@ -44,6 +46,7 @@ const createStockAdjustmentIntoDB = async (payload: any) => {
     const result = await StockAdjustmentModel.create(
       [{
         ...payload,
+        adjustmentType: payload.adjustmentType === "Damage" ? "Damaged" : payload.adjustmentType, // ডাটাবেজে স্ট্যান্ডার্ড রাখার জন্য
         product: product._id,
       }],
       { session }
