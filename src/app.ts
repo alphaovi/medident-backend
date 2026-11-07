@@ -25,6 +25,7 @@ const app: Application = express();
 app.use(cors());
 
 app.use(express.json());
+
 // Vercel সার্ভারলেসের জন্য প্রতিটি রিকোয়েস্টে ডাটাবেজ কানেকশন নিশ্চিত করার মিডলওয়্যার
 app.use(async (req, res, next) => {
   try {
