@@ -21,6 +21,12 @@ const createPurchaseOrderIntoDB = async (payload: any) => {
           totalStock: 0,
           currentStock: 0,
           onTransit: 0,
+          damaged: 0,
+          lost: 0,
+          freeSample: 0,
+          purchaseReturn: 0,
+          sellReturn: 0,
+          totalSell: 0,
           avgBuyingPrice: 0,
           totalStockValue: 0,
         });
@@ -33,8 +39,12 @@ const createPurchaseOrderIntoDB = async (payload: any) => {
         inventory.onTransit += Number(item.orderQuantity || 0);
       } else if (result.status === "Received") {
         const orderQty = Number(item.orderQuantity || 0);
-        inventory.currentStock += orderQty;
         inventory.totalStock += orderQty;
+
+        inventory.currentStock = Math.max(
+          0,
+          inventory.totalStock - inventory.totalSell - (inventory.damaged || 0) - (inventory.lost || 0) - (inventory.freeSample || 0) - (inventory.purchaseReturn || 0) + (inventory.sellReturn || 0)
+        );
 
         const newTotalStockValue = inventory.totalStockValue + (orderQty * Number(item.unitCost || 0));
         inventory.totalStockValue = newTotalStockValue;
@@ -81,7 +91,6 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
     throw new Error("This purchase order has already been received and cannot be edited!");
   }
 
-  // Strict Sequential Status Validation (Ordered ➔ On Transit ➔ Received)
   if (newStatus && currentStatus !== newStatus) {
     if (currentStatus === "Ordered" && newStatus === "Received") {
       throw new Error("Invalid transition! You must move the order to 'On Transit' before marking it as 'Received'.");
@@ -137,6 +146,12 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
             totalStock: 0,
             currentStock: 0,
             onTransit: 0,
+            damaged: 0,
+            lost: 0,
+            freeSample: 0,
+            purchaseReturn: 0,
+            sellReturn: 0,
+            totalSell: 0,
             avgBuyingPrice: 0,
             totalStockValue: 0,
           });
@@ -162,6 +177,12 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
           totalStock: 0,
           currentStock: 0,
           onTransit: 0,
+          damaged: 0,
+          lost: 0,
+          freeSample: 0,
+          purchaseReturn: 0,
+          sellReturn: 0,
+          totalSell: 0,
           avgBuyingPrice: 0,
           totalStockValue: 0,
         });
@@ -197,6 +218,12 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
           totalStock: 0,
           currentStock: 0,
           onTransit: 0,
+          damaged: 0,
+          lost: 0,
+          freeSample: 0,
+          purchaseReturn: 0,
+          sellReturn: 0,
+          totalSell: 0,
           avgBuyingPrice: 0,
           totalStockValue: 0,
         });
@@ -207,8 +234,12 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
       }
 
       const orderQty = Number(item.orderQuantity || 0);
-      inventory.currentStock += orderQty;
       inventory.totalStock += orderQty;
+
+      inventory.currentStock = Math.max(
+        0,
+        inventory.totalStock - inventory.totalSell - (inventory.damaged || 0) - (inventory.lost || 0) - (inventory.freeSample || 0) - (inventory.purchaseReturn || 0) + (inventory.sellReturn || 0)
+      );
 
       const newTotalStockValue = inventory.totalStockValue + (orderQty * Number(item.unitCost || 0));
       inventory.totalStockValue = newTotalStockValue;
@@ -268,6 +299,7 @@ const deletePurchaseOrderFromDB = async (purchaseId: string) => {
   return result;
 };
 
+// আবশ্যিকভাবে এখানে PurchaseOrderServices নামে এক্সপোর্ট করা হয়েছে
 export const PurchaseOrderServices = {
   createPurchaseOrderIntoDB,
   getAllPurchaseOrdersFromDB,

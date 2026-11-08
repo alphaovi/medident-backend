@@ -95,10 +95,11 @@ const createSaleOrderIntoDB = async (payload: any) => {
       const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
       if (inventory) {
         const updatedTotalSell = (inventory.totalSell || 0) + item.quantity;
-        const updatedTotalStock = Math.max(0, inventory.totalStock - item.quantity);
+        
+        // totalStock অপরিবর্তিত থাকবে, শুধু totalSell বাড়বে
         const updatedCurrentStock = Math.max(
           0,
-          updatedTotalStock - updatedTotalSell - (inventory.lostDamage || 0) - (inventory.damaged || 0) - (inventory.lost || 0) - (inventory.freeSample || 0)
+          inventory.totalStock - updatedTotalSell - (inventory.damaged || 0) - (inventory.lost || 0) - (inventory.freeSample || 0) - (inventory.purchaseReturn || 0) + (inventory.sellReturn || 0)
         );
 
         await InventoryModel.findOneAndUpdate(
@@ -106,7 +107,6 @@ const createSaleOrderIntoDB = async (payload: any) => {
           {
             $set: {
               currentStock: updatedCurrentStock,
-              totalStock: updatedTotalStock,
               totalSell: updatedTotalSell,
               totalStockValue: Number((updatedCurrentStock * inventory.avgBuyingPrice).toFixed(2)),
               totalSaleValue: Number(((inventory.totalSaleValue || 0) + item.afterDiscount).toFixed(2)),
@@ -142,14 +142,14 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
     const customer = await CustomerModel.findOne(customerQuery).session(session);
     if (!customer) throw new Error(`Customer not found: ${payload.customer}`);
 
+    // পুরানো অর্ডার রিস্টোর করা (totalStock হাত না দিয়ে শুধু totalSell কমানো)
     for (const item of existingOrder.products) {
       const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
       if (inventory) {
-        inventory.totalStock += item.quantity;
         inventory.totalSell = Math.max(0, (inventory.totalSell || 0) - item.quantity);
         inventory.currentStock = Math.max(
           0,
-          inventory.totalStock - inventory.totalSell - (inventory.lostDamage || 0) - (inventory.damaged || 0) - (inventory.lost || 0) - (inventory.freeSample || 0)
+          inventory.totalStock - inventory.totalSell - (inventory.damaged || 0) - (inventory.lost || 0) - (inventory.freeSample || 0) - (inventory.purchaseReturn || 0) + (inventory.sellReturn || 0)
         );
         await inventory.save({ session });
       }
@@ -208,10 +208,11 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
       const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
       if (inventory) {
         const updatedTotalSell = (inventory.totalSell || 0) + item.quantity;
-        const updatedTotalStock = Math.max(0, inventory.totalStock - item.quantity);
+        
+        // totalStock অপরিবর্তিত থাকবে, শুধু totalSell বাড়বে
         const updatedCurrentStock = Math.max(
           0,
-          updatedTotalStock - updatedTotalSell - (inventory.lostDamage || 0) - (inventory.damaged || 0) - (inventory.lost || 0) - (inventory.freeSample || 0)
+          inventory.totalStock - updatedTotalSell - (inventory.damaged || 0) - (inventory.lost || 0) - (inventory.freeSample || 0) - (inventory.purchaseReturn || 0) + (inventory.sellReturn || 0)
         );
 
         await InventoryModel.findOneAndUpdate(
@@ -219,7 +220,6 @@ const updateSaleOrderIntoDB = async (id: string, payload: any) => {
           {
             $set: {
               currentStock: updatedCurrentStock,
-              totalStock: updatedTotalStock,
               totalSell: updatedTotalSell,
               totalStockValue: Number((updatedCurrentStock * inventory.avgBuyingPrice).toFixed(2)),
               totalSaleValue: Number(((inventory.totalSaleValue || 0) + item.afterDiscount).toFixed(2)),
@@ -288,11 +288,10 @@ const deleteSaleOrderFromDB = async (id: string) => {
     for (const item of order.products) {
       const inventory = await InventoryModel.findOne({ product: item.product }).session(session);
       if (inventory) {
-        inventory.totalStock += item.quantity;
         inventory.totalSell = Math.max(0, (inventory.totalSell || 0) - item.quantity);
         inventory.currentStock = Math.max(
           0,
-          inventory.totalStock - inventory.totalSell - (inventory.lostDamage || 0) - (inventory.damaged || 0) - (inventory.lost || 0) - (inventory.freeSample || 0)
+          inventory.totalStock - inventory.totalSell - (inventory.damaged || 0) - (inventory.lost || 0) - (inventory.freeSample || 0) - (inventory.purchaseReturn || 0) + (inventory.sellReturn || 0)
         );
         await inventory.save({ session });
       }

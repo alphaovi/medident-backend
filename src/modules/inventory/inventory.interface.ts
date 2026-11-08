@@ -7,7 +7,6 @@ export type Inventory = {
   totalStock: number;
   purchaseReturn: number;
   sellReturn: number;
-  lostDamage: number;
   totalSell: number;
   currentStock: number;
   onTransit: number;
