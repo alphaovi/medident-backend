@@ -8,18 +8,14 @@ export type OrderItem = {
   product: Types.ObjectId;
   quantity: number;
   price: number;
-  discount?: number;
+  discountType: "percent" | "flat"; // Strict mandatory
+  discountValue: number;            // Strict mandatory
+  discount: number;
   totalPrice: number;
   afterDiscount: number;
 };
 
-// Payment record type for history
-export type PaymentRecord = {
-  amount: number;
-  date: Date;
-};
-
-export type SaleOrder = {
+export type ISaleOrder = {
   stateOrRegion: string;
   customer: Types.ObjectId;
   orderDate: Date;
@@ -27,8 +23,8 @@ export type SaleOrder = {
   generalDiscountType?: "%" | "flat";
   generalDiscountValue?: number;
   paidAmount: number;
-  payments: PaymentRecord[]; // Date soho payment history array
-  grandTotal: number;
   dueAmount: number;
+  grandTotal: number;
+  payments: { amount: number; date: Date }[];
   status: OrderStatus;
 };

@@ -1,39 +1,54 @@
 import { z } from "zod";
 
 const orderItemValidationSchema = z.object({
-  group: z.string({ required_error: "Group ID is required" }).trim().min(1, "Group ID is required"),
-  subGroup: z.string({ required_error: "Sub-group ID is required" }).trim().min(1, "Sub-group ID is required"),
-  product: z.string({ required_error: "Product ID is required" }).trim().min(1, "Product ID is required"),
-  quantity: z.number({ required_error: "Quantity must be a number" }).int("Quantity must be a whole number").min(1, "Quantity must be at least 1"),
-  discount: z.number({ required_error: "Discount must be a number" }).min(0, "Discount cannot be negative").optional(),
+  group: z.string().min(1),
+  subGroup: z.string().min(1),
+  product: z.string().min(1),
+  quantity: z.number().positive(),
+  price: z.number().nonnegative(),
+
+  // Strict validation without optional/skipping
+  discountType: z.enum(["percent", "flat"]),
+  discountValue: z.number().min(0),
+
+  discount: z.number().min(0).optional(),
+  totalPrice: z.number().optional(),
+  afterDiscount: z.number().optional(),
 });
 
-// Payment validation schema
 const paymentValidationSchema = z.object({
-  amount: z.number({ required_error: "Payment amount must be a number" }).min(0, "Amount cannot be negative"),
-  date: z.union([z.string().min(1, "Date is required"), z.date()]).optional(),
+  amount: z.number().positive(),
+  date: z.coerce.date(),
 });
 
-export const createSaleOrderValidationSchema = z.object({
-  body: z.object({
-    saleOrder: z.object({
-      stateOrRegion: z.string({ required_error: "State / Region is required" }).trim().min(1, "State / Region is required"),
-      customer: z.string({ required_error: "Customer ID is required" }).trim().min(1, "Customer ID is required"),
-      orderDate: z.union([z.string().min(1, "Order date is required"), z.date()]),
-      products: z.array(orderItemValidationSchema).min(1, "At least one product is required"),
-      generalDiscountType: z.enum(["%", "flat"]).optional(),
-      generalDiscountValue: z.number({ required_error: "General discount must be a number" }).min(0, "General discount cannot be negative").optional(),
-      paidAmount: z.number({ required_error: "Paid amount must be a number" }).min(0, "Paid amount cannot be negative"),
-      payments: z.array(paymentValidationSchema).optional(), // <-- Optional ba required rakhte paro
-      status: z.enum(["pending", "approved", "delivered"]).optional(),
-    }),
-  }),
+const saleOrderDataValidationSchema = z.object({
+  stateOrRegion: z.string().min(1),
+  customer: z.string().min(1),
+  orderDate: z.coerce.date(),
+
+  products: z.array(orderItemValidationSchema).min(1),
+
+  generalDiscountType: z.enum(["%", "flat"]).default("%"),
+  generalDiscountValue: z.number().min(0).default(0),
+
+  paidAmount: z.number().min(0).default(0),
+  payments: z.array(paymentValidationSchema).optional(),
+
+  grandTotal: z.number().min(0).optional(),
+  dueAmount: z.number().min(0).optional(),
+
+  status: z.enum(["pending", "approved", "delivered"]).default("pending"),
 });
 
-export const updateOrderStatusValidationSchema = z.object({
-  body: z.object({
-    status: z.enum(["pending", "approved", "delivered"], {
-      required_error: "Status is required",
-    }),
-  }),
+const createSaleOrderValidationSchema = z.object({
+  saleOrder: saleOrderDataValidationSchema,
 });
+
+const updateOrderStatusValidationSchema = z.object({
+  status: z.enum(["pending", "approved", "delivered"]),
+});
+
+export {
+  createSaleOrderValidationSchema,
+  updateOrderStatusValidationSchema,
+};
