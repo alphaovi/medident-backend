@@ -1,5 +1,6 @@
 import { SaleOrder } from './salesOrder.model.js';
 import { ISaleOrder, ISaleOrderItem } from './salesOrder.interface.js';
+import { InventoryModel } from '../inventory/inventory.model.js'; // আপনার প্রজেক্টের ফোল্ডার স্ট্রাকচার অনুযায়ী পাথ ঠিক করে নেবেন
 
 export class SaleOrderService {
   public static async createOrder(payload: Partial<ISaleOrder>): Promise<ISaleOrder> {
@@ -74,6 +75,22 @@ export class SaleOrderService {
     };
 
     const newOrder = await SaleOrder.create(orderData);
+
+    // ১. নতুন সেল অর্ডার তৈরি হওয়ার সাথে সাথে ইনভেন্টরি স্টক মাইনাস করা হলো
+    if (calculatedProducts && calculatedProducts.length > 0) {
+      for (const item of calculatedProducts) {
+        await InventoryModel.findOneAndUpdate(
+          { product: item.product },
+          {
+            $inc: {
+              currentStock: -item.quantity, // স্টক কমানো হলো
+            },
+          },
+          { upsert: true, new: true }
+        );
+      }
+    }
+
     return newOrder;
   }
 
@@ -89,6 +106,21 @@ export class SaleOrderService {
     const existingOrder = await SaleOrder.findById(id);
     if (!existingOrder) {
       return null;
+    }
+
+    // ২. অর্ডার আপডেট করার আগে পূর্বের প্রোডাক্টগুলোর স্টক আবার ইনভেন্টরিতে ফিরিয়ে দেওয়া (Restore)
+    if (existingOrder.products && existingOrder.products.length > 0) {
+      for (const oldItem of existingOrder.products) {
+        await InventoryModel.findOneAndUpdate(
+          { product: oldItem.product },
+          {
+            $inc: {
+              currentStock: oldItem.quantity, // পুরনো স্টক যোগ করে রিভার্ট করা হলো
+            },
+          },
+          { upsert: true, new: true }
+        );
+      }
     }
 
     let subTotal = existingOrder.subTotal;
@@ -166,6 +198,21 @@ export class SaleOrderService {
       runValidators: true
     }).populate('customer products.customer products.product');
 
+    // ৩. আপডেট হওয়া নতুন প্রোডাক্টগুলোর পরিমাণ অনুযায়ী আবার ইনভেন্টরি স্টক মাইনাস করা
+    if (calculatedProducts && calculatedProducts.length > 0) {
+      for (const newItem of calculatedProducts) {
+        await InventoryModel.findOneAndUpdate(
+          { product: newItem.product },
+          {
+            $inc: {
+              currentStock: -newItem.quantity, // নতুন স্টক মাইনাস করা হলো
+            },
+          },
+          { upsert: true, new: true }
+        );
+      }
+    }
+
     return updatedOrder;
   }
 
@@ -174,6 +221,23 @@ export class SaleOrderService {
   }
 
   public static async deleteOrder(id: string): Promise<ISaleOrder | null> {
-    return await SaleOrder.findByIdAndDelete(id);
+    const deletedOrder = await SaleOrder.findByIdAndDelete(id);
+
+    // ৪. অর্ডার ডিলিট করা হলে বিক্রি হওয়া স্টক আবার ইনভেন্টরিতে ফিরিয়ে দেওয়া
+    if (deletedOrder && deletedOrder.products && deletedOrder.products.length > 0) {
+      for (const item of deletedOrder.products) {
+        await InventoryModel.findOneAndUpdate(
+          { product: item.product },
+          {
+            $inc: {
+              currentStock: item.quantity, // স্টক রিভার্ট করা হলো
+            },
+          },
+          { upsert: true, new: true }
+        );
+      }
+    }
+
+    return deletedOrder;
   }
 }
