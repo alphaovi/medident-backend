@@ -6,6 +6,7 @@ export class SaleOrderService {
     let subTotal = 0;
     let calculatedProducts: ISaleOrderItem[] = [];
     const orderState = payload.stateOrRegion || "DefaultState";
+    const mainCustomer = payload.customer;
 
     if (payload.products && payload.products.length > 0) {
       calculatedProducts = payload.products.map((item: any) => {
@@ -28,7 +29,7 @@ export class SaleOrderService {
         return {
           ...item,
           state: orderState,
-          customer: payload.customer,
+          customer: item.customer || mainCustomer,
           totalPrice,
           discountAmount,
           afterDiscount
@@ -59,6 +60,7 @@ export class SaleOrderService {
     const orderData = {
       ...payload,
       stateOrRegion: orderState,
+      customer: mainCustomer,
       products: calculatedProducts,
       generalDiscountType: genDiscType,
       generalDiscountValue: genDiscVal,
@@ -76,11 +78,11 @@ export class SaleOrderService {
   }
 
   public static async getAllOrders() {
-    return await SaleOrder.find().populate('products.customer products.product');
+    return await SaleOrder.find().populate('customer products.customer products.product');
   }
 
   public static async getOrderById(id: string) {
-    return await SaleOrder.findById(id).populate('products.customer products.product');
+    return await SaleOrder.findById(id).populate('customer products.customer products.product');
   }
 
   public static async updateOrder(id: string, payload: Partial<ISaleOrder>): Promise<ISaleOrder | null> {
@@ -116,7 +118,7 @@ export class SaleOrderService {
         return {
           ...item,
           state: orderState,
-          customer: orderCustomer,
+          customer: item.customer || orderCustomer,
           totalPrice,
           discountAmount,
           afterDiscount
@@ -162,7 +164,7 @@ export class SaleOrderService {
     const updatedOrder = await SaleOrder.findByIdAndUpdate(id, updatedData, {
       new: true,
       runValidators: true
-    }).populate('products.customer products.product');
+    }).populate('customer products.customer products.product');
 
     return updatedOrder;
   }

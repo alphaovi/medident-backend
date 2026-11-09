@@ -25,6 +25,7 @@ const saleOrderItemSchema = new Schema<ISaleOrderItem>({
 const saleOrderSchema = new Schema<ISaleOrder>(
   {
     stateOrRegion: { type: String, required: true, trim: true },
+    customer: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
     orderDate: { type: Date, default: Date.now },
     products: [saleOrderItemSchema],
     generalDiscountType: { type: String, enum: ['percentage', 'fixed'], default: 'fixed' },

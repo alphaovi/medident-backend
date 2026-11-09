@@ -26,6 +26,7 @@ export interface ISaleOrderItem {
 
 export interface ISaleOrder extends Document {
   stateOrRegion: string;
+  customer: Types.ObjectId | string;
   orderDate: Date;
   products: ISaleOrderItem[];
   generalDiscountType: DiscountType;
