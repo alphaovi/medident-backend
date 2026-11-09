@@ -1,18 +1,4 @@
-import { Router } from 'express';
-<<<<<<< HEAD
 
-import { createSaleOrderZodSchema, validateZod } from './salesOrder.validation.js';
-import { SaleOrderController } from './saleOrder.controller.js';
-
-const router = Router();
-
-router.post('/', validateZod(createSaleOrderZodSchema), SaleOrderController.create);
-router.get('/', SaleOrderController.getAll);
-router.get('/:id', SaleOrderController.getById);
-
-=======
-import { createSaleOrderZodSchema, updateSaleOrderZodSchema, validateZod } from './salesOrder.validation.js';
-import { SaleOrderController } from './saleOrder.controller.js';
 
 const router = Router();
 
@@ -23,5 +9,4 @@ router.patch('/:id', validateZod(updateSaleOrderZodSchema), SaleOrderController.
 router.patch('/:id/status', SaleOrderController.updateStatus);
 router.delete('/:id', SaleOrderController.delete);
 
->>>>>>> main
 export const SaleOrderRoutes = router;
