@@ -1,5 +1,12 @@
 import { Document, Types } from "mongoose";
 
+export type ISellReturnPayment = {
+  date: Date;
+  amount: number;
+  paymentMethod?: string;
+  reference?: string;
+};
+
 export type ISellReturnItem = {
   state: string;
   customer: Types.ObjectId;
@@ -23,6 +30,8 @@ export type ISellReturn = Document & {
   generalDiscountType: "percentage" | "fixed";
   generalDiscountValue: number;
   grandTotal: number;
+  paidAmount: number; // <--- 새로 যোগ করা হয়েছে
+  payments: ISellReturnPayment[]; // <--- পেমেন্ট হিস্ট্রি অ্যারে
   status: "completed" | "pending";
   createdAt: Date;
   updatedAt: Date;

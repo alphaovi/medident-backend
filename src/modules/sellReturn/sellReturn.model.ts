@@ -1,6 +1,12 @@
 import { Schema, model } from "mongoose";
 import { ISellReturn, ISellReturnItem } from "./sellReturn.interface.js";
 
+const sellReturnPaymentSchema = new Schema({
+  date: { type: Date, default: Date.now },
+  amount: { type: Number, required: true },
+  paymentMethod: { type: String, default: "Cash" },
+  reference: { type: String, default: "" },
+});
 
 const sellReturnItemSchema = new Schema<ISellReturnItem>({
   state: { type: String, required: true },
@@ -26,6 +32,8 @@ const sellReturnSchema = new Schema<ISellReturn>(
     generalDiscountType: { type: String, enum: ["percentage", "fixed"], default: "percentage" },
     generalDiscountValue: { type: Number, default: 0 },
     grandTotal: { type: Number, required: true },
+    paidAmount: { type: Number, default: 0 }, // <--- 추가
+    payments: [sellReturnPaymentSchema], // <--- 추가
     status: { type: String, enum: ["completed", "pending"], default: "completed" },
   },
   { timestamps: true }

@@ -54,6 +54,13 @@ export class SellReturnService {
   }
 
   /**
+   * Update a Sell Return record by ID (Supports payment history & edits)
+   */
+  public static async updateSellReturn(id: string, payload: Partial<ISellReturn>): Promise<ISellReturn | null> {
+    return await SellReturnModel.findByIdAndUpdate(id, payload, { new: true });
+  }
+
+  /**
    * Delete a Sell Return record by ID
    */
   public static async deleteSellReturn(id: string): Promise<ISellReturn | null> {
