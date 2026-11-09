@@ -5,11 +5,8 @@ export class SaleOrderService {
   public static async createOrder(payload: Partial<ISaleOrder>): Promise<ISaleOrder> {
     let subTotal = 0;
     let calculatedProducts: ISaleOrderItem[] = [];
-<<<<<<< HEAD
-=======
     const orderState = payload.stateOrRegion || "DefaultState";
     const mainCustomer = payload.customer;
->>>>>>> main
 
     if (payload.products && payload.products.length > 0) {
       calculatedProducts = payload.products.map((item: any) => {
@@ -31,11 +28,8 @@ export class SaleOrderService {
 
         return {
           ...item,
-<<<<<<< HEAD
-=======
           state: orderState,
           customer: item.customer || mainCustomer,
->>>>>>> main
           totalPrice,
           discountAmount,
           afterDiscount
@@ -65,11 +59,8 @@ export class SaleOrderService {
 
     const orderData = {
       ...payload,
-<<<<<<< HEAD
-=======
       stateOrRegion: orderState,
       customer: mainCustomer,
->>>>>>> main
       products: calculatedProducts,
       generalDiscountType: genDiscType,
       generalDiscountValue: genDiscVal,
@@ -87,13 +78,6 @@ export class SaleOrderService {
   }
 
   public static async getAllOrders() {
-<<<<<<< HEAD
-    return await SaleOrder.find().populate('products.customer products.product');
-  }
-
-  public static async getOrderById(id: string) {
-    return await SaleOrder.findById(id).populate('products.customer products.product');
-=======
     return await SaleOrder.find().populate('customer products.customer products.product');
   }
 
@@ -191,6 +175,5 @@ export class SaleOrderService {
 
   public static async deleteOrder(id: string): Promise<ISaleOrder | null> {
     return await SaleOrder.findByIdAndDelete(id);
->>>>>>> main
   }
 }
