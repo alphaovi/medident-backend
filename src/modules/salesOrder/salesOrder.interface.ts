@@ -24,7 +24,9 @@ export interface ISaleOrderItem {
   afterDiscount: number;     
 }
 
-export interface ISaleOrder extends Document {
+export type SaleOrder = {
+  stateOrRegion: string;
+  customer: Types.ObjectId;
   orderDate: Date;
   products: ISaleOrderItem[];
   generalDiscountType: DiscountType;

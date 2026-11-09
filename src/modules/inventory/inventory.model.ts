@@ -1,4 +1,3 @@
-// inventory.model.ts
 import { Schema, model } from "mongoose";
 
 const inventorySchema = new Schema(
@@ -9,7 +8,6 @@ const inventorySchema = new Schema(
     totalStock: { type: Number, default: 0 },
     purchaseReturn: { type: Number, default: 0 },
     sellReturn: { type: Number, default: 0 },
-    lostDamage: { type: Number, default: 0 },
     totalSell: { type: Number, default: 0 },
     currentStock: { type: Number, default: 0 },
     onTransit: { type: Number, default: 0 },

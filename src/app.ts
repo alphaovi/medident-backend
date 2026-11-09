@@ -19,14 +19,13 @@ import { InventoryRoutes } from "./modules/inventory/inventory.route.js";
 
 import { connectDB } from "./config/config.js";
 import { StateRoutes } from "./modules/state/state.route.js";
-import { SaleOrderRoutes } from "./modules/salesOrder/saleOrder.route.js";
-import { StockAdjustmentRoutes } from "./modules/stockAdjustment/stockAdjustment.route.js";
 
 const app: Application = express();
 
 app.use(cors());
 
 app.use(express.json());
+
 // Vercel সার্ভারলেসের জন্য প্রতিটি রিকোয়েস্টে ডাটাবেজ কানেকশন নিশ্চিত করার মিডলওয়্যার
 app.use(async (req, res, next) => {
   try {
@@ -52,7 +51,7 @@ app.use("/api/v1/sale-orders", SaleOrderRoutes);
 app.use("/api/v1/inventory", InventoryRoutes);
 app.use("/api/v1/purchase-orders", PurchaseOrderRoutes);
 app.use("/api/v1/suppliers", supplierRoutes);
-app.use("/api/v1/stock-adjustment", StockAdjustmentRoutes);
+app.use("/api/v1/stock-adjustment", stockAdjustmentRoutes);
 app.use("/api/v1/states", StateRoutes);
 
 const getAController = (req: Request, res: Response) => {
