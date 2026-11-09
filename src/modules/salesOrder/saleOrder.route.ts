@@ -1,4 +1,6 @@
-
+import { Router } from 'express';
+import { createSaleOrderZodSchema, updateSaleOrderZodSchema, validateZod } from './salesOrder.validation.js';
+import { SaleOrderController } from './saleOrder.controller.js';
 
 const router = Router();
 
