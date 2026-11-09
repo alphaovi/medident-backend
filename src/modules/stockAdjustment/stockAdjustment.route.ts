@@ -1,16 +1,10 @@
-import { Router } from "express";
-import validateRequest from "../../middlewares/validateRequest.js";
-import { StockAdjustmentControllers } from "./stockAdjustment.controller.js";
-import { createStockAdjustmentValidationSchema } from "./stockAdjustment.validation.js";
+import { Router } from 'express';
+import { StockAdjustmentController } from './stockAdjustment.controller.js';
+import { createStockAdjustmentZodSchema, validateZod } from './stockAdjustment.validation.js';
 
 const router = Router();
 
-router.post(
-  "/create-stock-adjustment",
-  validateRequest(createStockAdjustmentValidationSchema), // এখানে সঠিক স্কিমাটি পাস করা হলো
-  StockAdjustmentControllers.createStockAdjustment
-);
+router.post('/', validateZod(createStockAdjustmentZodSchema), StockAdjustmentController.create);
+router.get('/', StockAdjustmentController.getAll);
 
-router.get("/", StockAdjustmentControllers.getAllStockAdjustments);
-
-export const stockAdjustmentRoutes = router;
+export const StockAdjustmentRoutes = router;

@@ -1,27 +1,41 @@
-import { Types } from "mongoose";
+import { Document, Types } from 'mongoose';
 
-export type OrderStatus = "pending" | "approved" | "delivered";
+export type DiscountType = 'percentage' | 'fixed';
+export type OrderStatus = 'pending' | 'approved' | 'delivered';
 
-export type OrderItem = {
-  group: Types.ObjectId;
-  subGroup: Types.ObjectId;
-  product: Types.ObjectId;
+export interface IPaymentRecord {
+  date: Date;
+  amount: number;
+  paymentMethod?: string;
+}
+
+export interface ISaleOrderItem {
+  state: string;
+  customer: Types.ObjectId | string;
+  group: string;
+  subGroup: string;
+  product: Types.ObjectId | string;
   quantity: number;
-  price: number;
-  discount?: number;
-  totalPrice: number;
-  afterDiscount: number;
-};
+  unitPrice: number;
+  discountType: DiscountType;
+  discountValue: number;
+  discountAmount: number;    
+  totalPrice: number;        
+  afterDiscount: number;     
+}
 
-export type SaleOrder = {
-  stateOrRegion: string;
-  customer: Types.ObjectId;
+export interface ISaleOrder extends Document {
   orderDate: Date;
-  products: OrderItem[];
-  generalDiscountType?: "%" | "flat";
-  generalDiscountValue?: number;
-  paidAmount: number;
+  products: ISaleOrderItem[];
+  generalDiscountType: DiscountType;
+  generalDiscountValue: number;
+  generalDiscountAmount: number;
+  subTotal: number;
   grandTotal: number;
+  paidAmount: number;
   dueAmount: number;
+  payments: IPaymentRecord[];
   status: OrderStatus;
-};
+  createdAt: Date;
+  updatedAt: Date;
+}

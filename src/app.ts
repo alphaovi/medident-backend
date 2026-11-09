@@ -11,14 +11,16 @@ import { productGroupRoutes } from "./modules/productGroup/productGroup.route.js
 import { productSubgroupRoutes } from "./modules/productSubgroup/productSubgroup.route.js";
 import { customerRoutes } from "./modules/customers/customer.route.js";
 import { employeeRoutes } from "./modules/employee/employee.route.js";
-import { saleOrderRoutes } from "./modules/salesOrder/saleOrder.route.js";
+
 import { supplierRoutes } from "./modules/suppliers/supplier.route.js";
 import { PurchaseOrderRoutes } from "./modules/purchaseOrder/purchaseOrder.route.js";
 import { ProductRoutes } from "./modules/product/product.route.js";
 import { InventoryRoutes } from "./modules/inventory/inventory.route.js";
-import { stockAdjustmentRoutes } from "./modules/stockAdjustment/stockAdjustment.route.js";
+
 import { connectDB } from "./config/config.js";
 import { StateRoutes } from "./modules/state/state.route.js";
+import { SaleOrderRoutes } from "./modules/salesOrder/saleOrder.route.js";
+import { StockAdjustmentRoutes } from "./modules/stockAdjustment/stockAdjustment.route.js";
 
 const app: Application = express();
 
@@ -46,11 +48,11 @@ app.use("/api/v1/product-subgroups", productSubgroupRoutes);
 app.use("/api/v1/products", ProductRoutes);
 app.use("/api/v1/employees", employeeRoutes);
 app.use("/api/v1/customers", customerRoutes);
-app.use("/api/v1/sale-orders", saleOrderRoutes);
+app.use("/api/v1/sale-orders", SaleOrderRoutes);
 app.use("/api/v1/inventory", InventoryRoutes);
 app.use("/api/v1/purchase-orders", PurchaseOrderRoutes);
 app.use("/api/v1/suppliers", supplierRoutes);
-app.use("/api/v1/stock-adjustment", stockAdjustmentRoutes);
+app.use("/api/v1/stock-adjustment", StockAdjustmentRoutes);
 app.use("/api/v1/states", StateRoutes);
 
 const getAController = (req: Request, res: Response) => {

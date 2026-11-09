@@ -1,34 +1,12 @@
-import express from "express";
-import validateRequest from "../../middlewares/validateRequest.js";
-import { 
-  createSaleOrderValidationSchema, 
-  updateOrderStatusValidationSchema 
-} from "./salesOrder.validation.js";
-import { SaleOrderControllers } from "./saleOrder.controller.js";
+import { Router } from 'express';
 
-const router = express.Router();
+import { createSaleOrderZodSchema, validateZod } from './salesOrder.validation.js';
+import { SaleOrderController } from './saleOrder.controller.js';
 
-// Create Sale Order
-router.post(
-  "/create-sale-order",
-  validateRequest(createSaleOrderValidationSchema),
-  SaleOrderControllers.createSaleOrder
-);
+const router = Router();
 
-// Get All Sale Orders
-router.get("/", SaleOrderControllers.getAllSaleOrders);
+router.post('/', validateZod(createSaleOrderZodSchema), SaleOrderController.create);
+router.get('/', SaleOrderController.getAll);
+router.get('/:id', SaleOrderController.getById);
 
-// Get Single Sale Order by ID
-router.get("/:id", SaleOrderControllers.getSaleOrder);
-
-// Update Sale Order Status (Patch)
-router.patch(
-  "/:id/status",
-  validateRequest(updateOrderStatusValidationSchema),
-  SaleOrderControllers.updateOrderStatus
-);
-
-// Delete Sale Order
-router.delete("/:id", SaleOrderControllers.deleteSaleOrder);
-
-export const saleOrderRoutes = router;
+export const SaleOrderRoutes = router;
