@@ -1,54 +1,72 @@
-import { z } from "zod";
+import { z } from 'zod';
+import { Request, Response, NextFunction } from 'express';
 
-const orderItemValidationSchema = z.object({
-  group: z.string().min(1),
-  subGroup: z.string().min(1),
-  product: z.string().min(1),
-  quantity: z.number().positive(),
-  price: z.number().nonnegative(),
-
-  // Strict validation without optional/skipping
-  discountType: z.enum(["percent", "flat"]),
-  discountValue: z.number().min(0),
-
-  discount: z.number().min(0).optional(),
-  totalPrice: z.number().optional(),
-  afterDiscount: z.number().optional(),
+const paymentSchema = z.object({
+  date: z.string().datetime().optional().or(z.date().optional()),
+  amount: z.number().min(0, 'Amount cannot be negative'),
+  paymentMethod: z.string().optional()
 });
 
-const paymentValidationSchema = z.object({
-  amount: z.number().positive(),
-  date: z.coerce.date(),
+const productItemSchema = z.object({
+  state: z.string().optional(),
+  customer: z.string().optional(),
+  group: z.string({ required_error: 'Group is required' }),
+  subGroup: z.string({ required_error: 'SubGroup is required' }),
+  product: z.string({ required_error: 'Product ID is required' }),
+  quantity: z.number().min(1, 'Quantity must be at least 1'),
+  unitPrice: z.number().min(0, 'Unit price cannot be negative'),
+  discountType: z.enum(['percentage', 'fixed']),
+  discountValue: z.number().min(0, 'Discount value cannot be negative'),
+  discountAmount: z.number().min(0).optional(),
+  totalPrice: z.number().min(0).optional(),
+  afterDiscount: z.number().min(0).optional()
 });
 
-const saleOrderDataValidationSchema = z.object({
-  stateOrRegion: z.string().min(1),
-  customer: z.string().min(1),
-  orderDate: z.coerce.date(),
-
-  products: z.array(orderItemValidationSchema).min(1),
-
-  generalDiscountType: z.enum(["%", "flat"]).default("%"),
-  generalDiscountValue: z.number().min(0).default(0),
-
-  paidAmount: z.number().min(0).default(0),
-  payments: z.array(paymentValidationSchema).optional(),
-
-  grandTotal: z.number().min(0).optional(),
-  dueAmount: z.number().min(0).optional(),
-
-  status: z.enum(["pending", "approved", "delivered"]).default("pending"),
+export const createSaleOrderZodSchema = z.object({
+  body: z.object({
+    saleOrder: z.object({
+      stateOrRegion: z.string({ required_error: 'State or region is required' }),
+      customer: z.string({ required_error: 'Customer ID is required' }),
+      orderDate: z.string().datetime().optional().or(z.date().optional()),
+      products: z.array(productItemSchema).min(1, 'At least one product is required'),
+      generalDiscountType: z.enum(['percentage', 'fixed']).optional(),
+      generalDiscountValue: z.number().min(0).optional(),
+      payments: z.array(paymentSchema).optional(),
+      status: z.enum(['pending', 'approved', 'delivered']).optional()
+    })
+  })
 });
 
-const createSaleOrderValidationSchema = z.object({
-  saleOrder: saleOrderDataValidationSchema,
+export const updateSaleOrderZodSchema = z.object({
+  body: z.object({
+    saleOrder: z.object({
+      stateOrRegion: z.string().optional(),
+      customer: z.string().optional(),
+      orderDate: z.string().datetime().optional().or(z.date().optional()),
+      products: z.array(productItemSchema).min(1).optional(),
+      generalDiscountType: z.enum(['percentage', 'fixed']).optional(),
+      generalDiscountValue: z.number().min(0).optional(),
+      payments: z.array(paymentSchema).optional(),
+      status: z.enum(['pending', 'approved', 'delivered']).optional()
+    }).optional()
+  })
 });
 
-const updateOrderStatusValidationSchema = z.object({
-  status: z.enum(["pending", "approved", "delivered"]),
-});
-
-export {
-  createSaleOrderValidationSchema,
-  updateOrderStatusValidationSchema,
+export const validateZod = (schema: z.AnyZodObject) => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      await schema.parseAsync({
+        body: req.body,
+        query: req.query,
+        params: req.params,
+      });
+      next();
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        message: 'Validation Error',
+        errors: error.errors ? error.errors.map((err: any) => err.message) : error.message
+      });
+    }
+  };
 };

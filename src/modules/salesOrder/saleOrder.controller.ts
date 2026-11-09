@@ -1,225 +1,124 @@
+import { Request, Response } from 'express';
+import { SaleOrderService } from './salesOrder.service.js';
 
-import { Request, Response } from "express";
-import { SaleOrderServices } from "./salesOrder.service.js";
-
-const handleError = (error: unknown, res: Response) => {
-  console.error(error);
-
-  const message =
-    error instanceof Error ? error.message : "Something went wrong";
-
-  const statusCode =
-    message.includes("not found") ? 404 :
-    message.includes("Invalid") ||
-    message.includes("required") ||
-    message.includes("Insufficient stock") ||
-    message.includes("Invalid quantity") ||
-    message.includes("Invalid price") ? 400 : 500;
-
-  return res.status(statusCode).json({
-    success: false,
-    message,
-    error: message,
-  });
-};
-
-// CREATE SALE ORDER
-const createSaleOrder = async (req: Request, res: Response) => {
-  try {
-    const { saleOrder } = req.body;
-
-    if (!saleOrder || typeof saleOrder !== "object") {
-      return res.status(400).json({
+export class SaleOrderController {
+  public static async create(req: Request, res: Response): Promise<void> {
+    try {
+      const result = await SaleOrderService.createOrder(req.body.saleOrder);
+      res.status(201).json({
+        success: true,
+        message: 'Sale Order created successfully!',
+        data: result
+      });
+    } catch (error: any) {
+      res.status(400).json({
         success: false,
-        message: "Sale order data is required",
+        message: error.message || 'Failed to create sale order'
       });
     }
-
-    const result = await SaleOrderServices.createSaleOrderIntoDB(saleOrder);
-
-    return res.status(201).json({
-      success: true,
-      message: "Sale order created successfully",
-      data: result,
-    });
-  } catch (error) {
-    return handleError(error, res);
   }
-};
 
-// GET ALL SALE ORDERS
-const getAllSaleOrders = async (req: Request, res: Response) => {
-  try {
-    const result = await SaleOrderServices.getAllSaleOrdersFromDB();
-
-    return res.status(200).json({
-      success: true,
-      message: "Sale orders retrieved successfully",
-      data: result,
-    });
-  } catch (error) {
-    return handleError(error, res);
+  public static async getAll(req: Request, res: Response): Promise<void> {
+    try {
+      const result = await SaleOrderService.getAllOrders();
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
   }
-};
 
-// GET SINGLE SALE ORDER
-const getSaleOrder = async (req: Request, res: Response) => {
-  try {
-    const id = req.params.id as string;
-
-    if (!id) {
-      return res.status(400).json({
+  public static async getById(req: Request, res: Response): Promise<void> {
+    try {
+      const result = await SaleOrderService.getOrderById(req.params.id);
+      if (!result) {
+        res.status(404).json({ success: false, message: 'Order not found' });
+        return;
+      }
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+    } catch (error: any) {
+      res.status(500).json({
         success: false,
-        message: "Sale order ID is required",
+        message: error.message
       });
     }
-
-    const result = await SaleOrderServices.getSaleOrderByIdFromDB(id);
-
-    if (!result) {
-      return res.status(404).json({
-        success: false,
-        message: "Sale order not found",
-        data: null,
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Sale order retrieved successfully",
-      data: result,
-    });
-  } catch (error) {
-    return handleError(error, res);
   }
-};
 
-// UPDATE SALE ORDER
-const updateSaleOrder = async (req: Request, res: Response) => {
-  try {
-    const id = req.params.id as string;
-    const { saleOrder } = req.body;
+  public static async update(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const result = await SaleOrderService.updateOrder(id, req.body.saleOrder || req.body);
+      
+      if (!result) {
+        res.status(404).json({ success: false, message: 'Order not found for update' });
+        return;
+      }
 
-    if (!id) {
-      return res.status(400).json({
+      res.status(200).json({
+        success: true,
+        message: 'Sale Order updated successfully!',
+        data: result
+      });
+    } catch (error: any) {
+      res.status(400).json({
         success: false,
-        message: "Sale order ID is required",
+        message: error.message || 'Failed to update sale order'
       });
     }
-
-    if (!saleOrder || typeof saleOrder !== "object") {
-      return res.status(400).json({
-        success: false,
-        message: "Sale order data is required",
-      });
-    }
-
-    const result = await SaleOrderServices.updateSaleOrderIntoDB(
-      id,
-      saleOrder
-    );
-
-    if (!result) {
-      return res.status(404).json({
-        success: false,
-        message: "Sale order not found",
-        data: null,
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Sale order updated successfully",
-      data: result,
-    });
-  } catch (error) {
-    return handleError(error, res);
   }
-};
 
-// UPDATE SALE ORDER STATUS
-const updateOrderStatus = async (req: Request, res: Response) => {
-  try {
-    const id = req.params.id as string;
-    const { status } = req.body;
+  public static async updateStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const result = await SaleOrderService.updateStatus(id, status);
 
-    const allowedStatuses = ["pending", "approved", "delivered"];
+      if (!result) {
+        res.status(404).json({ success: false, message: 'Order not found' });
+        return;
+      }
 
-    if (!id) {
-      return res.status(400).json({
+      res.status(200).json({
+        success: true,
+        message: 'Order status updated successfully!',
+        data: result
+      });
+    } catch (error: any) {
+      res.status(400).json({
         success: false,
-        message: "Sale order ID is required",
+        message: error.message || 'Failed to update status'
       });
     }
-
-    if (!allowedStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid order status",
-        allowedStatuses,
-      });
-    }
-
-    const result = await SaleOrderServices.updateSaleOrderStatusIntoDB(
-      id,
-      status
-    );
-
-    if (!result) {
-      return res.status(404).json({
-        success: false,
-        message: "Sale order not found",
-        data: null,
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: `Sale order status updated to ${status} successfully`,
-      data: result,
-    });
-  } catch (error) {
-    return handleError(error, res);
   }
-};
 
-// DELETE SALE ORDER
-const deleteSaleOrder = async (req: Request, res: Response) => {
-  try {
-    const id = req.params.id as string;
+  public static async delete(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const result = await SaleOrderService.deleteOrder(id);
 
-    if (!id) {
-      return res.status(400).json({
+      if (!result) {
+        res.status(404).json({ success: false, message: 'Order not found for deletion' });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Sale Order deleted successfully!',
+        data: result
+      });
+    } catch (error: any) {
+      res.status(500).json({
         success: false,
-        message: "Sale order ID is required",
+        message: error.message || 'Failed to delete sale order'
       });
     }
-
-    const result = await SaleOrderServices.deleteSaleOrderFromDB(id);
-
-    if (!result) {
-      return res.status(404).json({
-        success: false,
-        message: "Sale order not found",
-        data: null,
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Sale order deleted successfully",
-      data: result,
-    });
-  } catch (error) {
-    return handleError(error, res);
   }
-};
-
-export const SaleOrderControllers = {
-  createSaleOrder,
-  getAllSaleOrders,
-  getSaleOrder,
-  updateSaleOrder,
-  updateOrderStatus,
-  deleteSaleOrder,
-};
+}

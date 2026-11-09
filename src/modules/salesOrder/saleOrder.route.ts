@@ -1,40 +1,14 @@
-import express from "express";
-import validateRequest from "../../middlewares/validateRequest.js";
-import { 
-  createSaleOrderValidationSchema, 
-  updateOrderStatusValidationSchema 
-} from "./salesOrder.validation.js";
-import { SaleOrderControllers } from "./saleOrder.controller.js";
+import { Router } from 'express';
+import { createSaleOrderZodSchema, updateSaleOrderZodSchema, validateZod } from './salesOrder.validation.js';
+import { SaleOrderController } from './saleOrder.controller.js';
 
-const router = express.Router();
+const router = Router();
 
-// Create Sale Order
-router.post(
-  "/create-sale-order",
-  validateRequest(createSaleOrderValidationSchema),
-  SaleOrderControllers.createSaleOrder
-);
+router.post('/create-sale-order', validateZod(createSaleOrderZodSchema), SaleOrderController.create);
+router.get('/', SaleOrderController.getAll);
+router.get('/:id', SaleOrderController.getById);
+router.patch('/:id', validateZod(updateSaleOrderZodSchema), SaleOrderController.update);
+router.patch('/:id/status', SaleOrderController.updateStatus);
+router.delete('/:id', SaleOrderController.delete);
 
-// Get All Sale Orders
-router.get("/", SaleOrderControllers.getAllSaleOrders);
-
-// Get Single Sale Order by ID
-router.get("/:id", SaleOrderControllers.getSaleOrder);
-
-// Update Full Sale Order using PATCH
-router.patch(
-  "/:id",
-  SaleOrderControllers.updateSaleOrder
-);
-
-// Update Sale Order Status (Patch)
-router.patch(
-  "/:id/status",
-  validateRequest(updateOrderStatusValidationSchema),
-  SaleOrderControllers.updateOrderStatus
-);
-
-// Delete Sale Order
-router.delete("/:id", SaleOrderControllers.deleteSaleOrder);
-
-export const saleOrderRoutes = router;
+export const SaleOrderRoutes = router;
