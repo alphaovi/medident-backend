@@ -22,6 +22,7 @@ import { StateRoutes } from "./modules/state/state.route.js";
 import { SellReturnRoutes } from "./modules/sellReturn/sellReturn.route.js";
 import { SalesOrderRoutes } from "./modules/salesOrder/salesOrder.route.js";
 
+
 const app: Application = express();
 
 app.use(cors({
