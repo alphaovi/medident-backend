@@ -48,11 +48,11 @@ const salesOrderSchema = new Schema<ISaleOrder>(
   }
 );
 
-// 🟢 Mongoose Async Pre-Save Hook (NO next() parameter)
+// 🟢 Mongoose Async Pre-Save Hook (Calculation & Financial Logic)
 salesOrderSchema.pre("save", async function () {
   let subtotal = 0;
 
-  if (Array.isArray(this.products)) {
+  if (Array.isArray(this.products) && this.products.length > 0) {
     this.products.forEach((p) => {
       const qty = Number(p.quantity) || 0;
       const unitPrice = Number(p.unitPrice) || 0;
@@ -60,6 +60,7 @@ salesOrderSchema.pre("save", async function () {
 
       let itemDiscountAmount = 0;
       const dVal = Number(p.discountValue) || 0;
+      
       if (p.discountType === "percentage") {
         itemDiscountAmount = (itemTotal * dVal) / 100;
       } else {
@@ -76,6 +77,7 @@ salesOrderSchema.pre("save", async function () {
 
   let generalDiscountAmount = 0;
   const genVal = Number(this.generalDiscountValue) || 0;
+
   if (this.generalDiscountType === "percentage") {
     generalDiscountAmount = (subtotal * genVal) / 100;
   } else {

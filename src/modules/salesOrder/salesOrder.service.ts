@@ -1,6 +1,9 @@
+
 import mongoose from "mongoose";
 import { InventoryModel } from "../inventory/inventory.model.js";
-import { SalesOrderModel } from "./salesorder.model.js"; // 🟢 সঠিক ছোট হাতের মডেল ফাইল ইমপোর্ট করা হলো
+import { SalesOrderModel } from "./salesOrder.model.js";
+
+
 
 /**
  * 🟢 Serial-wise Inventory Sync & Total Sell Update Logic (100% Guaranteed Fix)
