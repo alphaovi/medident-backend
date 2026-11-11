@@ -17,28 +17,31 @@ import { PurchaseOrderRoutes } from "./modules/purchaseOrder/purchaseOrder.route
 import { ProductRoutes } from "./modules/product/product.route.js";
 import { InventoryRoutes } from "./modules/inventory/inventory.route.js";
 import { stockAdjustmentRoutes } from "./modules/stockAdjustment/stockAdjustment.route.js";
-import { connectDB } from "./config/config.js";
 import { StateRoutes } from "./modules/state/state.route.js";
-import { SaleOrderRoutes } from "./modules/salesOrder/saleOrder.route.js";
+
 import { SellReturnRoutes } from "./modules/sellReturn/sellReturn.route.js";
+import { SalesOrderRoutes } from "./modules/salesOrder/salesOrder.route.js";
 
 const app: Application = express();
 
-app.use(cors());
-
+app.use(cors({
+  origin: true,
+  credentials: true,
+}));
 app.use(express.json());
 
-// Vercel সার্ভারলেসের জন্য প্রতিটি রিকোয়েস্টে ডাটাবেজ কানেকশন নিশ্চিত করার মিডলওয়্যার
+// 🟢 সেফটি চেক: যদি connectDB প্রজেক্টে থাকে তবেই রান করবে, অন্যথায় মেইন কানেকশন কাজ করবে
 app.use(async (req, res, next) => {
   try {
-    await connectDB();
+    // optional chaining দিয়ে চেক করা হলো যাতে ফাংশন না থাকলে ক্র্যাশ না করে
+    const dbModule = await import("./config/config.js").catch(() => null);
+    if (dbModule && typeof dbModule.connectDB === "function") {
+      await dbModule.connectDB();
+    }
     next();
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Database connection failed",
-      error: error instanceof Error ? error.message : error,
-    });
+    console.error("Database connection middleware error:", error);
+    next(); // এরর হলেও যাতে রিকোয়েস্ট ব্লক না হয়ে কন্ট্রোলারে যায়
   }
 });
 
@@ -49,7 +52,7 @@ app.use("/api/v1/product-subgroups", productSubgroupRoutes);
 app.use("/api/v1/products", ProductRoutes);
 app.use("/api/v1/employees", employeeRoutes);
 app.use("/api/v1/customers", customerRoutes);
-app.use("/api/v1/sale-orders", SaleOrderRoutes);
+app.use("/api/v1/sale-orders", SalesOrderRoutes);
 app.use("/api/v1/inventory", InventoryRoutes);
 app.use("/api/v1/purchase-orders", PurchaseOrderRoutes);
 app.use("/api/v1/suppliers", supplierRoutes);

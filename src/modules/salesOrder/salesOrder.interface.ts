@@ -1,43 +1,37 @@
-import { Document, Types } from 'mongoose';
+import { Schema, Document } from "mongoose";
 
-export type DiscountType = 'percentage' | 'fixed';
-export type OrderStatus = 'pending' | 'approved' | 'delivered';
+export type ISaleOrderItem = {
+  state: string;
+  customer: Schema.Types.ObjectId;
+  group: Schema.Types.ObjectId;
+  subGroup: Schema.Types.ObjectId;
+  product: Schema.Types.ObjectId;
+  quantity: number;
+  unitPrice: number;
+  discountType: "percentage" | "fixed";
+  discountValue: number;
+  discountAmount: number;
+  totalPrice: number;
+  afterDiscount: number;
+};
 
-export interface IPaymentRecord {
+export type IPaymentHistory = {
   date: Date;
   amount: number;
   paymentMethod?: string;
-}
+};
 
-export interface ISaleOrderItem {
-  state: string;
-  customer: Types.ObjectId | string;
-  group: string;
-  subGroup: string;
-  product: Types.ObjectId | string;
-  quantity: number;
-  unitPrice: number;
-  discountType: DiscountType;
-  discountValue: number;
-  discountAmount: number;    
-  totalPrice: number;        
-  afterDiscount: number;     
-}
-
-export interface ISaleOrder extends Document {
+export type ISaleOrder = Document & {
   stateOrRegion: string;
-  customer: Types.ObjectId | string;
+  customer: Schema.Types.ObjectId;
   orderDate: Date;
   products: ISaleOrderItem[];
-  generalDiscountType: DiscountType;
+  generalDiscountType: "percentage" | "fixed";
   generalDiscountValue: number;
-  generalDiscountAmount: number;
-  subTotal: number;
+  subtotal: number;
   grandTotal: number;
   paidAmount: number;
   dueAmount: number;
-  payments: IPaymentRecord[];
-  status: OrderStatus;
-  createdAt: Date;
-  updatedAt: Date;
-}
+  payments: IPaymentHistory[];
+  status: "pending" | "approved" | "delivered" | "cancelled";
+};

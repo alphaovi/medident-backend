@@ -1,12 +1,14 @@
+import mongoose from "mongoose";
 import { ProductSubgroup } from "./productSubgroup.interface.js";
 import { ProductSubgroupModel } from "./productSubgroup.model.js";
+
+// 🟢 সেফ রেজিস্টার: যদি মডেল অলরেডি রেজিস্টার্ড না থাকে তবে ProductSubGroup নামে রেজিস্টার করে নিবে
+const ActiveSubgroupModel = mongoose.models.ProductSubGroup || mongoose.model("ProductSubGroup", ProductSubgroupModel.schema);
 
 const createProductSubgroupIntoDB = async (
   productSubgroup: ProductSubgroup
 ) => {
-  const result =
-    await ProductSubgroupModel.create(productSubgroup);
-
+  const result = await ActiveSubgroupModel.create(productSubgroup);
   return result;
 };
 
@@ -14,44 +16,25 @@ const getAllProductSubgroupsFromDB = async (
   group?: string
 ) => {
   const filter = group ? { group } : {};
-
-  const result = await ProductSubgroupModel.find(filter).populate(
-    "group"
-  );
-
+  const result = await ActiveSubgroupModel.find(filter).populate("group");
   return result;
 };
 
 const getSingleProductSubgroupFromDB = async (id: string) => {
-  const result = await ProductSubgroupModel
-    .findOne({ id })
-    .populate("group");
-
+  const result = await ActiveSubgroupModel.findOne({ id }).populate("group");
   return result;
 };
 
-const updateProductSubgroupIntoDB = async (
-  id: string,
-  productSubgroup: Partial<ProductSubgroup>
-) => {
-  const result = await ProductSubgroupModel.findOneAndUpdate(
-    { id },
-    productSubgroup,
-    {
-      new: true,
-      runValidators: true,
-    }
-  ).populate("group");
-
+const updateProductSubgroupIntoDB = async (id: string, payload: Partial<ProductSubgroup>) => {
+  const result = await ActiveSubgroupModel.findOneAndUpdate({ id }, payload, {
+    new: true,
+    runValidators: true,
+  });
   return result;
 };
 
-const deleteSingleProductSubgroupFromDB = async (
-  id: string
-) => {
-  const result =
-    await ProductSubgroupModel.findOneAndDelete({ id });
-
+const deleteProductSubgroupFromDB = async (id: string) => {
+  const result = await ActiveSubgroupModel.findOneAndDelete({ id });
   return result;
 };
 
@@ -60,5 +43,5 @@ export const ProductSubgroupServices = {
   getAllProductSubgroupsFromDB,
   getSingleProductSubgroupFromDB,
   updateProductSubgroupIntoDB,
-  deleteSingleProductSubgroupFromDB,
+  deleteProductSubgroupFromDB,
 };
