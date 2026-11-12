@@ -226,8 +226,9 @@ const getCustomerStatementFromDB = async (query: {
   fromDate?: string;
   toDate?: string;
   paymentStatus?: string;
+  orderStatus?: string;
 }) => {
-  const { customerId, fromDate, toDate, paymentStatus } = query;
+  const { customerId, fromDate, toDate, paymentStatus, orderStatus } = query;
 
   const filter: any = { customer: customerId };
 
@@ -239,6 +240,11 @@ const getCustomerStatementFromDB = async (query: {
     };
   }
 
+  // Order Status ফিল্টার (Pending, Approved, Delivered)
+  if (orderStatus && orderStatus.toLowerCase() !== "all") {
+    filter.status = { $regex: new RegExp(`^${orderStatus}$`, "i") };
+  }
+
   const orders = await SalesOrderModel.find(filter)
     .populate("customer")
     .populate("products.product")
@@ -246,12 +252,12 @@ const getCustomerStatementFromDB = async (query: {
     .populate("products.subGroup")
     .sort({ orderDate: -1 });
 
-  // পেমেন্ট স্ট্যাটাস ফিল্টার (যদি প্রয়োজন হয়)
+  // Payment Status ফিল্টার (Paid, Unpaid)
   let filteredOrders = orders;
   if (paymentStatus && paymentStatus !== "all" && paymentStatus !== "none") {
     filteredOrders = orders.filter((order: any) => {
-      const due = order.dueAmount || 0;
-      const paid = order.paidAmount || 0;
+      const due = Number(order.dueAmount) || 0;
+      const paid = Number(order.paidAmount) || 0;
       if (paymentStatus === "paid") return due <= 0 && paid > 0;
       if (paymentStatus === "unpaid") return due > 0;
       return true;
@@ -260,7 +266,6 @@ const getCustomerStatementFromDB = async (query: {
 
   return filteredOrders;
 };
-
 export const SalesOrderServices = {
   createSalesOrderIntoDB,
   getAllSalesOrdersFromDB,
