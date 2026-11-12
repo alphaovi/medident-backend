@@ -20,4 +20,5 @@ export type Customer = {
   phone: string;
   sr: Types.ObjectId;
   status: CustomerStatus;
+  openingBalance?: number; // নতুন অপশনাল ফিল্ড
 };
