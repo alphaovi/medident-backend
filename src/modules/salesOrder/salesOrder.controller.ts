@@ -94,6 +94,31 @@ const deleteSalesOrder = async (req: Request, res: Response, next: NextFunction)
   }
 };
 
+const getCustomerStatement = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const { fromDate, toDate, paymentStatus } = req.query;
+
+    const result = await SalesOrderServices.getCustomerStatementFromDB({
+      customerId,
+      fromDate,
+      toDate,
+      paymentStatus,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Customer statement fetched successfully",
+      data: result,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || "Something went wrong",
+    });
+  }
+};
+
 export const SalesOrderControllers = {
   createSalesOrder,
   getAllSalesOrders,
@@ -101,4 +126,5 @@ export const SalesOrderControllers = {
   updateSalesOrder,
   updateOrderStatus,
   deleteSalesOrder,
+  getCustomerStatement
 };

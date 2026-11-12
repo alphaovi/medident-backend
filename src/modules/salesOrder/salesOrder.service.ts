@@ -221,6 +221,46 @@ const deleteSalesOrderFromDB = async (id: string) => {
   return await SalesOrderModel.findByIdAndDelete(id);
 };
 
+const getCustomerStatementFromDB = async (query: {
+  customerId: string;
+  fromDate?: string;
+  toDate?: string;
+  paymentStatus?: string;
+}) => {
+  const { customerId, fromDate, toDate, paymentStatus } = query;
+
+  const filter: any = { customer: customerId };
+
+  // ডেট রেঞ্জ ফিল্টার
+  if (fromDate && toDate) {
+    filter.orderDate = {
+      $gte: new Date(fromDate),
+      $lte: new Date(toDate),
+    };
+  }
+
+  const orders = await SalesOrderModel.find(filter)
+    .populate("customer")
+    .populate("products.product")
+    .populate("products.group")
+    .populate("products.subGroup")
+    .sort({ orderDate: -1 });
+
+  // পেমেন্ট স্ট্যাটাস ফিল্টার (যদি প্রয়োজন হয়)
+  let filteredOrders = orders;
+  if (paymentStatus && paymentStatus !== "all" && paymentStatus !== "none") {
+    filteredOrders = orders.filter((order: any) => {
+      const due = order.dueAmount || 0;
+      const paid = order.paidAmount || 0;
+      if (paymentStatus === "paid") return due <= 0 && paid > 0;
+      if (paymentStatus === "unpaid") return due > 0;
+      return true;
+    });
+  }
+
+  return filteredOrders;
+};
+
 export const SalesOrderServices = {
   createSalesOrderIntoDB,
   getAllSalesOrdersFromDB,
@@ -228,4 +268,5 @@ export const SalesOrderServices = {
   updateSalesOrderIntoDB,
   updateOrderStatusInDB,
   deleteSalesOrderFromDB,
+  getCustomerStatementFromDB
 };
