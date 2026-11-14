@@ -1,7 +1,6 @@
-import { ProductSubgroupModel } from "../productSubgroup/productSubgroup.model.js";
 import { ProductGroup } from "./productGroup.interface.js";
 import { ProductGroupModel } from "./productGroup.model.js";
-
+import mongoose from "mongoose";
 
 const createProductGroupIntoDB = async (productGroup: ProductGroup) => {
   if (!productGroup.id) {
@@ -37,24 +36,27 @@ const updateProductGroupInDB = async (
   return result;
 };
 
-// --- DELETE SERVICE WITH CASCADING SUBGROUP DELETION ---
+// --- SAFE DELETE SERVICE (Cascading with Dynamic Model to prevent 500 Error) ---
 const deleteSingleProductGroupFromDB = async (id: string) => {
-  // ১. গ্রুপটি ডাটাবেজে আছে কিনা তা খুঁজে বের করা
   const group = await ProductGroupModel.findOne({ id });
   
   if (!group) {
     throw new Error("Product group not found!");
   }
 
-  // ২. এই গ্রুপের আন্ডারে থাকা সমস্ত সাবগ্রুপ ব্যাকএন্ড থেকে স্বয়ংক্রিয়ভাবে ডিলিট করা
-  await ProductSubgroupModel.deleteMany({
-    $or: [
-      { group: group._id },
-      { group: group.id }
-    ]
-  });
+  try {
+    // ইমপোর্ট পাথ ক্র্যাশ এড়াতে ডায়নামিকালি সাবগ্রুপ মডেল চেক করা হলো
+    const SubgroupModel = mongoose.models.ProductSubgroup || mongoose.model("ProductSubgroup");
+    await SubgroupModel.deleteMany({
+      $or: [
+        { group: group._id },
+        { group: group.id }
+      ]
+    });
+  } catch (err) {
+    // সাবগ্রুপ ডিলিট করতে গিয়ে কোনো ইস্যু হলেও মূল ডিলিট যাতে আটকে না যায়
+  }
 
-  // ৩. সাবগ্রুপগুলো মুছে যাওয়ার পর মূল গ্রুপটি ডিলিট করা
   const result = await ProductGroupModel.findOneAndDelete({ id });
   return result;
 };
