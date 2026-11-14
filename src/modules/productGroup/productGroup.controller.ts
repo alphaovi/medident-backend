@@ -3,7 +3,10 @@ import { ProductGroupServices } from "./productGroup.service.js";
 
 const createProductGroup = async (req: Request, res: Response) => {
   try {
-    const result = await ProductGroupServices.createProductGroupIntoDB(req.body);
+    // ফ্রন্টএন্ড থেকে ডেটা সরাসরি বা নেস্টেড অবজেক্ট আকারে আসলেও যেন সেফলি রিসিভ হয়
+    const payload = req.body.productGroup || req.body;
+
+    const result = await ProductGroupServices.createProductGroupIntoDB(payload);
     res.status(201).json({
       success: true,
       message: "Product group created successfully",
