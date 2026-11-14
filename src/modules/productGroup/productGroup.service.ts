@@ -1,6 +1,7 @@
+import { ProductSubgroupModel } from "../productSubgroup/productSubgroup.model.js";
 import { ProductGroup } from "./productGroup.interface.js";
 import { ProductGroupModel } from "./productGroup.model.js";
-import { ProductSubgroupModel } from "../productSubgroup/productSubgroup.model.js";
+
 
 const createProductGroupIntoDB = async (productGroup: ProductGroup) => {
   if (!productGroup.id) {
