@@ -20,15 +20,12 @@ const phoneValidation = z
     if (value.startsWith("+880")) {
       return value.slice(4);
     }
-
     if (value.startsWith("880")) {
       return value.slice(3);
     }
-
     if (value.startsWith("0")) {
       return value.slice(1);
     }
-
     return value;
   })
   .refine(
@@ -76,6 +73,8 @@ export const createCustomerValidationSchema = z.object({
       sr: objectIdValidation,
 
       status: z.enum(["Active", "Inactive"]).default("Active"),
+
+      openingBalance: z.number().optional(), // অপশনাল ফিল্ড ভ্যালিডেশন
     }),
   }),
 });
@@ -105,6 +104,8 @@ export const updateCustomerValidationSchema = z.object({
         sr: objectIdValidation.optional(),
 
         status: z.enum(["Active", "Inactive"]).optional(),
+
+        openingBalance: z.number().optional(), // আপডেট করার জন্য অপশনাল ফিল্ড
       })
       .refine(
         (data) =>
@@ -114,7 +115,8 @@ export const updateCustomerValidationSchema = z.object({
           data.address !== undefined ||
           data.phone !== undefined ||
           data.sr !== undefined ||
-          data.status !== undefined,
+          data.status !== undefined ||
+          data.openingBalance !== undefined,
         {
           message: "At least one field is required for update",
         }

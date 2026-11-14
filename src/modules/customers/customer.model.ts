@@ -60,6 +60,11 @@ const CustomerSchema = new Schema<Customer>(
       default: "Active",
       required: true,
     },
+
+    openingBalance: {
+      type: Number,
+      default: 0, // অপশনাল বা ডিফল্ট ০ থাকতে পারে
+    },
   },
   {
     timestamps: true,
