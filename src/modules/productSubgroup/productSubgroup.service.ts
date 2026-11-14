@@ -8,6 +8,11 @@ const ActiveSubgroupModel = mongoose.models.ProductSubGroup || mongoose.model("P
 const createProductSubgroupIntoDB = async (
   productSubgroup: ProductSubgroup
 ) => {
+  if (!productSubgroup.id) {
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(2, 7);
+    productSubgroup.id = `sub-${timestamp}-${randomStr}`;
+  }
   const result = await ActiveSubgroupModel.create(productSubgroup);
   return result;
 };
@@ -39,8 +44,8 @@ const updateProductSubgroupIntoDB = async (id: string, payload: Partial<ProductS
   return result;
 };
 
-// 🟢 সেফ ডিলিট: আইডি (sub-xxxx) অথবা _id যেকোনো একটি পেলেই ডিলিট করে দেবে
-const deleteProductSubgroupFromDB = async (id: string) => {
+// 🟢 ফাংশন নেম কন্ট্রোলারের সাথে ম্যাচ করানো হলো এবং কাস্টম আইডি (sub-xxxx) অথবা _id উভয়টি সাপোর্ট করবে
+const deleteSingleProductSubgroupFromDB = async (id: string) => {
   const query = mongoose.Types.ObjectId.isValid(id)
     ? { $or: [{ id }, { _id: id }] }
     : { id };
@@ -54,5 +59,5 @@ export const ProductSubgroupServices = {
   getAllProductSubgroupsFromDB,
   getSingleProductSubgroupFromDB,
   updateProductSubgroupIntoDB,
-  deleteProductSubgroupFromDB,
+  deleteSingleProductSubgroupFromDB,
 };
