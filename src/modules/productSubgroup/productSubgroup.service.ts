@@ -21,20 +21,31 @@ const getAllProductSubgroupsFromDB = async (
 };
 
 const getSingleProductSubgroupFromDB = async (id: string) => {
-  const result = await ActiveSubgroupModel.findOne({ id }).populate("group");
+  const query = mongoose.Types.ObjectId.isValid(id)
+    ? { $or: [{ id }, { _id: id }] }
+    : { id };
+  const result = await ActiveSubgroupModel.findOne(query).populate("group");
   return result;
 };
 
 const updateProductSubgroupIntoDB = async (id: string, payload: Partial<ProductSubgroup>) => {
-  const result = await ActiveSubgroupModel.findOneAndUpdate({ id }, payload, {
+  const query = mongoose.Types.ObjectId.isValid(id)
+    ? { $or: [{ id }, { _id: id }] }
+    : { id };
+  const result = await ActiveSubgroupModel.findOneAndUpdate(query, payload, {
     new: true,
     runValidators: true,
   });
   return result;
 };
 
+// 🟢 সেফ ডিলিট: আইডি (sub-xxxx) অথবা _id যেকোনো একটি পেলেই ডিলিট করে দেবে
 const deleteProductSubgroupFromDB = async (id: string) => {
-  const result = await ActiveSubgroupModel.findOneAndDelete({ id });
+  const query = mongoose.Types.ObjectId.isValid(id)
+    ? { $or: [{ id }, { _id: id }] }
+    : { id };
+    
+  const result = await ActiveSubgroupModel.findOneAndDelete(query);
   return result;
 };
 
