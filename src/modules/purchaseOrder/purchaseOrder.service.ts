@@ -5,6 +5,7 @@ import { InventoryModel } from "../inventory/inventory.model.js";
 const createPurchaseOrderIntoDB = async (payload: any) => {
   const result = await PurchaseOrderModel.create(payload);
   
+  // 🟢 Fix: Status jodi "Ordered" hoy, tahole inventory-te kichu add hobe na. Shudhu "On Transit" ba "Received" holei inventory update hobe.
   if (result.status === "On Transit" || result.status === "Received") {
     const productIds = result.items.map((item: any) => item.product);
     const inventories = await InventoryModel.find({ product: { $in: productIds } });
