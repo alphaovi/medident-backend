@@ -1,22 +1,27 @@
+// purchaseOrder.route.ts
 import { Router } from "express";
 import validateRequest from "../../middlewares/validateRequest.js";
-import { ProductControllers } from "./product.controller.js";
-import { ProductValidation } from "./product.validation.js";
+import { PurchaseOrderControllers } from "./purchaseOrder.controller.js";
+import { PurchaseOrderValidation } from "./purchaseOrder.validation.js";
 
 const router = Router();
 
 router.post(
-  "/create-product",
-  validateRequest(ProductValidation.createProductZodSchema),
-  ProductControllers.createProduct
+  "/create-purchase-order", 
+  validateRequest(PurchaseOrderValidation.createPurchaseOrderZodSchema), 
+  PurchaseOrderControllers.createPurchaseOrder
 );
-router.get("/", ProductControllers.getAllProducts);
-router.get("/:id", ProductControllers.getSingleProduct);
-router.patch(
-  "/:id",
-  validateRequest(ProductValidation.updateProductZodSchema),
-  ProductControllers.updateProduct
-);
-router.delete("/:id", ProductControllers.deleteProduct);
 
-export const ProductRoutes = router;
+router.get("/", PurchaseOrderControllers.getAllPurchaseOrders);
+
+router.get("/:purchaseId", PurchaseOrderControllers.getSinglePurchaseOrder);
+
+router.patch(
+  "/:purchaseId", 
+  validateRequest(PurchaseOrderValidation.updatePurchaseOrderZodSchema),
+  PurchaseOrderControllers.updatePurchaseOrder
+);
+
+router.delete("/:purchaseId", PurchaseOrderControllers.deletePurchaseOrder);
+
+export const PurchaseOrderRoutes = router;
