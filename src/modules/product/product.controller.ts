@@ -1,96 +1,58 @@
-// purchaseOrder.controller.ts
 import { Request, Response } from "express";
-import { PurchaseOrderServices } from "./purchaseOrder.service.js";
+import { ProductServices } from "./product.service.js";
 
-const createPurchaseOrder = async (req: Request, res: Response) => {
+const createProduct = async (req: Request, res: Response) => {
   try {
-    const result = await PurchaseOrderServices.createPurchaseOrderIntoDB(req.body);
-    res.status(201).json({ 
-      success: true, 
-      message: "Purchase order created successfully", 
-      data: result 
-    });
+    const result = await ProductServices.createProductIntoDB(req.body);
+    res.status(201).json({ success: true, message: "Product created successfully", data: result });
   } catch (error: any) {
-    res.status(500).json({ 
-      success: false, 
-      message: error.message || "Something went wrong", 
-      error 
-    });
+    res.status(500).json({ success: false, message: error.message || "Something went wrong", error });
   }
 };
 
-const getAllPurchaseOrders = async (req: Request, res: Response) => {
+const getAllProducts = async (req: Request, res: Response) => {
   try {
-    const result = await PurchaseOrderServices.getAllPurchaseOrdersFromDB();
-    res.status(200).json({ 
-      success: true, 
-      message: "Purchase orders retrieved successfully", 
-      data: result 
-    });
+    const result = await ProductServices.getAllProductsFromDB();
+    res.status(200).json({ success: true, message: "Products retrieved successfully", data: result });
   } catch (error: any) {
-    res.status(500).json({ 
-      success: false, 
-      message: error.message || "Something went wrong", 
-      error 
-    });
+    res.status(500).json({ success: false, message: error.message || "Something went wrong", error });
   }
 };
 
-const getSinglePurchaseOrder = async (req: Request, res: Response) => {
+const getSingleProduct = async (req: Request, res: Response) => {
   try {
-    const result = await PurchaseOrderServices.getSinglePurchaseOrderFromDB(req.params.purchaseId);
-    res.status(200).json({ 
-      success: true, 
-      message: "Purchase order retrieved successfully", 
-      data: result 
-    });
+    const result = await ProductServices.getSingleProductFromDB(req.params.id);
+    res.status(200).json({ success: true, message: "Product retrieved successfully", data: result });
   } catch (error: any) {
-    res.status(500).json({ 
-      success: false, 
-      message: error.message || "Something went wrong", 
-      error 
-    });
+    res.status(500).json({ success: false, message: error.message || "Something went wrong", error });
   }
 };
 
-const updatePurchaseOrder = async (req: Request, res: Response) => {
+const updateProduct = async (req: Request, res: Response) => {
   try {
-    const result = await PurchaseOrderServices.updatePurchaseOrderInDB(req.params.purchaseId, req.body);
-    res.status(200).json({ 
-      success: true, 
-      message: "Purchase order updated successfully", 
-      data: result 
-    });
+    // Front-end theke kothokhon `req.body.product` ba direct `req.body` aste pare, tai safety check rakha holo
+    const updateData = req.body.product || req.body;
+    const result = await ProductServices.updateProductInDB(req.params.id, updateData);
+    
+    res.status(200).json({ success: true, message: "Product updated successfully", data: result });
   } catch (error: any) {
-    res.status(500).json({ 
-      success: false, 
-      message: error.message || "Something went wrong", 
-      error 
-    });
+    res.status(500).json({ success: false, message: error.message || "Something went wrong", error });
   }
 };
 
-const deletePurchaseOrder = async (req: Request, res: Response) => {
+const deleteProduct = async (req: Request, res: Response) => {
   try {
-    const result = await PurchaseOrderServices.deletePurchaseOrderFromDB(req.params.purchaseId);
-    res.status(200).json({ 
-      success: true, 
-      message: "Purchase order deleted successfully", 
-      data: result 
-    });
+    const result = await ProductServices.deleteProductFromDB(req.params.id);
+    res.status(200).json({ success: true, message: "Product deleted successfully", data: result });
   } catch (error: any) {
-    res.status(500).json({ 
-      success: false, 
-      message: error.message || "Something went wrong", 
-      error 
-    });
+    res.status(500).json({ success: false, message: error.message || "Something went wrong", error });
   }
 };
 
-export const PurchaseOrderControllers = {
-  createPurchaseOrder,
-  getAllPurchaseOrders,
-  getSinglePurchaseOrder,
-  updatePurchaseOrder,
-  deletePurchaseOrder,
+export const ProductControllers = {
+  createProduct,
+  getAllProducts,
+  getSingleProduct,
+  updateProduct,
+  deleteProduct,
 };
