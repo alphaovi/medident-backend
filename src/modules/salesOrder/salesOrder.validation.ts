@@ -15,10 +15,26 @@ const saleItemValidationSchema = z.object({
   afterDiscount: z.number().min(0),
 });
 
+const paymentBankSnapshotValidationSchema = z
+  .object({
+    bankName: z.string().optional(),
+    accountNo: z.string().optional(),
+    accountName: z.string().optional(),
+    branch: z.string().optional(),
+    details: z.string().optional(),
+  })
+  .nullable()
+  .optional();
+
 const paymentValidationSchema = z.object({
   date: z.string().optional(),
   amount: z.number().min(0),
   paymentMethod: z.string().optional(),
+  bankId: z.string().nullable().optional(),
+  bankDetails: paymentBankSnapshotValidationSchema,
+  status: z.string().optional(),
+  note: z.string().optional(),
+  receipt: z.string().nullable().optional(),
 });
 
 export const createSalesOrderValidationSchema = z.object({
@@ -46,5 +62,18 @@ export const updateSalesOrderValidationSchema = z.object({
 export const updateOrderStatusValidationSchema = z.object({
   body: z.object({
     status: z.enum(["pending", "approved", "delivered", "cancelled"]),
+  }),
+});
+
+export const addOrderPaymentValidationSchema = z.object({
+  body: z.object({
+    amount: z.number().positive("Payment amount must be greater than 0"),
+    paymentMethod: z.string().optional(),
+    bankId: z.string().nullable().optional(),
+    bankDetails: paymentBankSnapshotValidationSchema,
+    status: z.string().optional(),
+    note: z.string().optional(),
+    receipt: z.string().nullable().optional(),
+    date: z.string().optional(),
   }),
 });

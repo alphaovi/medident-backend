@@ -19,11 +19,27 @@ const productItemSchema = new Schema(
   { _id: false }
 );
 
+const paymentBankSnapshotSchema = new Schema(
+  {
+    bankName: { type: String, default: "" },
+    accountNo: { type: String, default: "" },
+    accountName: { type: String, default: "" },
+    branch: { type: String, default: "" },
+    details: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
 const paymentSchema = new Schema(
   {
     date: { type: Date, default: Date.now },
     amount: { type: Number, required: true },
     paymentMethod: { type: String, default: "Cash" },
+    bankId: { type: Schema.Types.ObjectId, ref: "BanksDetail", default: null },
+    bankDetails: { type: paymentBankSnapshotSchema, default: null },
+    status: { type: String, default: "Approved" },
+    note: { type: String, default: "" },
+    receipt: { type: String, default: null },
   },
   { _id: false }
 );

@@ -1,9 +1,7 @@
-
 import mongoose from "mongoose";
 import { InventoryModel } from "../inventory/inventory.model.js";
 import { SalesOrderModel } from "./salesOrder.model.js";
-
-
+import { BanksDetailModel } from "../banksDetail/banksDetail.model.js";
 
 /**
  * 🟢 Serial-wise Inventory Sync & Total Sell Update Logic (100% Guaranteed Fix)
@@ -137,8 +135,75 @@ const revertInventoryTotalSell = async (item: any) => {
   }
 };
 
+// 🟢 Helper: Build payment object (saves bank info only if paymentMethod !== "Cash")
+const buildPaymentEntry = async (paymentPayload: any) => {
+  const rawMethod = (paymentPayload.paymentMethod || "Cash").trim();
+  const isCash = rawMethod.toLowerCase() === "cash";
+
+  if (isCash) {
+    return {
+      date: paymentPayload.date ? new Date(paymentPayload.date) : new Date(),
+      amount: Number(paymentPayload.amount) || 0,
+      paymentMethod: "Cash",
+      bankId: null,
+      bankDetails: null,
+      status: paymentPayload.status || "Approved",
+      note: paymentPayload.note || "",
+      receipt: paymentPayload.receipt || null,
+    };
+  }
+
+  let bankDoc: any = null;
+  if (paymentPayload.bankId && mongoose.isValidObjectId(paymentPayload.bankId)) {
+    bankDoc = await BanksDetailModel.findById(paymentPayload.bankId);
+  }
+
+  const snapshot = {
+    bankName:
+      paymentPayload.bankDetails?.bankName ||
+      bankDoc?.bankName ||
+      rawMethod,
+    accountNo:
+      paymentPayload.bankDetails?.accountNo ||
+      bankDoc?.accountNo ||
+      "",
+    accountName:
+      paymentPayload.bankDetails?.accountName ||
+      bankDoc?.accountName ||
+      "",
+    branch:
+      paymentPayload.bankDetails?.branch ||
+      bankDoc?.branch ||
+      "",
+    details:
+      paymentPayload.bankDetails?.details ||
+      bankDoc?.details ||
+      "",
+  };
+
+  return {
+    date: paymentPayload.date ? new Date(paymentPayload.date) : new Date(),
+    amount: Number(paymentPayload.amount) || 0,
+    paymentMethod: snapshot.bankName || rawMethod,
+    bankId: bankDoc?._id || (paymentPayload.bankId && mongoose.isValidObjectId(paymentPayload.bankId)
+      ? new mongoose.Types.ObjectId(paymentPayload.bankId)
+      : null),
+    bankDetails: snapshot,
+    status: paymentPayload.status || "Approved",
+    note: paymentPayload.note || "",
+    receipt: paymentPayload.receipt || null,
+  };
+};
+
 const createSalesOrderIntoDB = async (payload: any) => {
   const orderData = payload.saleOrder || payload;
+
+  if (Array.isArray(orderData.payments) && orderData.payments.length > 0) {
+    orderData.payments = await Promise.all(
+      orderData.payments.map((p: any) => buildPaymentEntry(p))
+    );
+  }
+
   const createdOrder = await SalesOrderModel.create(orderData);
 
   const productsList = orderData.products || createdOrder.products || [];
@@ -158,6 +223,7 @@ const getAllSalesOrdersFromDB = async () => {
     .populate("products.product")
     .populate("products.group")
     .populate("products.subGroup")
+    .populate("payments.bankId")
     .sort({ createdAt: -1 });
 };
 
@@ -166,7 +232,8 @@ const getSingleSalesOrderFromDB = async (id: string) => {
     .populate("customer")
     .populate("products.product")
     .populate("products.group")
-    .populate("products.subGroup");
+    .populate("products.subGroup")
+    .populate("payments.bankId");
 };
 
 const updateSalesOrderIntoDB = async (id: string, payload: any) => {
@@ -175,6 +242,12 @@ const updateSalesOrderIntoDB = async (id: string, payload: any) => {
   
   if (!existingOrder) {
     throw new Error("Sales order not found for update");
+  }
+
+  if (Array.isArray(orderData.payments) && orderData.payments.length > 0) {
+    orderData.payments = await Promise.all(
+      orderData.payments.map((p: any) => buildPaymentEntry(p))
+    );
   }
 
   if (Array.isArray(existingOrder.products)) {
@@ -197,6 +270,33 @@ const updateSalesOrderIntoDB = async (id: string, payload: any) => {
   }
 
   return updatedOrder;
+};
+
+// 🟢 Add Payment to an Existing Sales Order
+const addPaymentToSalesOrderInDB = async (id: string, paymentPayload: any) => {
+  const order = await SalesOrderModel.findById(id);
+  if (!order) {
+    throw new Error("Sales order not found");
+  }
+
+  const amount = Number(paymentPayload.amount) || 0;
+  if (amount <= 0) {
+    throw new Error("Payment amount must be greater than 0");
+  }
+
+  const paymentEntry = await buildPaymentEntry(paymentPayload);
+
+  order.payments.push(paymentEntry as any);
+  order.paidAmount = (Number(order.paidAmount) || 0) + amount;
+
+  await order.save(); // pre("save") automatically recalculates grandTotal & dueAmount
+
+  return await SalesOrderModel.findById(id)
+    .populate("customer")
+    .populate("products.product")
+    .populate("products.group")
+    .populate("products.subGroup")
+    .populate("payments.bankId");
 };
 
 const updateOrderStatusInDB = async (id: string, status: string) => {
@@ -250,6 +350,7 @@ const getCustomerStatementFromDB = async (query: {
     .populate("products.product")
     .populate("products.group")
     .populate("products.subGroup")
+    .populate("payments.bankId")
     .sort({ orderDate: -1 });
 
   // Payment Status ফিল্টার (Paid, Unpaid)
@@ -266,12 +367,14 @@ const getCustomerStatementFromDB = async (query: {
 
   return filteredOrders;
 };
+
 export const SalesOrderServices = {
   createSalesOrderIntoDB,
   getAllSalesOrdersFromDB,
   getSingleSalesOrderFromDB,
   updateSalesOrderIntoDB,
+  addPaymentToSalesOrderInDB,
   updateOrderStatusInDB,
   deleteSalesOrderFromDB,
-  getCustomerStatementFromDB
+  getCustomerStatementFromDB,
 };
