@@ -30,11 +30,14 @@ const userSchema = new Schema<IUser>(
   { timestamps: true }
 );
 
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
+userSchema.methods.hashPassword = async function (plainPassword: string): Promise<string> {
   const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
+  return await bcrypt.hash(plainPassword, salt);
+};
+
+userSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
+  this.password = await this.hashPassword(this.password);
 });
 
 export const UserModel = model<IUser>("User", userSchema);

@@ -4,6 +4,7 @@ import { AuthRequest } from "../../middlewares/auth.middleware.js";
 
 const registerUser = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    console.log("📥 registerUser hit with body:", req.body?.email);
     const result = await UserServices.registerUserIntoDB(req.body);
     return res.status(201).json({
       success: true,
@@ -11,6 +12,7 @@ const registerUser = async (req: AuthRequest, res: Response, next: NextFunction)
       data: result,
     });
   } catch (error: any) {
+    console.error("❌ registerUser error:", error?.message || error);
     return res.status(400).json({
       success: false,
       message: error.message || "User creation failed",

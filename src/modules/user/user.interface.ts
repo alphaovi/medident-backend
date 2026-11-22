@@ -14,6 +14,7 @@ export type IUser = Document & {
   role: IUserRole;
   status: IUserStatus;
   isActive: boolean;
+  isEmailVerified: boolean;
   activationToken?: string | null;
   activationExpires?: Date | null;
   resetPasswordToken?: string | null;

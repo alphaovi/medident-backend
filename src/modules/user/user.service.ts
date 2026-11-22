@@ -5,16 +5,20 @@ import { UserModel } from "./user.model.js";
 import { IAssignableRole, IJwtPayload, IUser } from "./user.interface.js";
 import { sendEmail } from "../../utils/sendEmail.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "medident_super_secret_hs256_key_2026";
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
-
 const ASSIGNABLE_ROLES: IAssignableRole[] = ["admin", "manager", "user"];
 
+const getJwtSecret = () =>
+  process.env.JWT_SECRET || "medident_super_secret_hs256_key_2026";
+
+const getJwtExpiresIn = () => process.env.JWT_EXPIRES_IN || "7d";
+
+const getFrontendUrl = () =>
+  process.env.FRONTEND_URL || "http://localhost:5173";
+
 const signToken = (payload: IJwtPayload): string => {
-  return jwt.sign(payload, JWT_SECRET, {
+  return jwt.sign(payload, getJwtSecret(), {
     algorithm: "HS256",
-    expiresIn: JWT_EXPIRES_IN as jwt.SignOptions["expiresIn"],
+    expiresIn: getJwtExpiresIn() as jwt.SignOptions["expiresIn"],
   });
 };
 
@@ -55,26 +59,35 @@ const registerUserIntoDB = async (payload: Partial<IUser>) => {
     activationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
   });
 
-  const activationLink = `${FRONTEND_URL}/verify-account?token=${rawActivationToken}`;
+  console.log("✅ User saved in DB:", createdUser._id, createdUser.email);
 
-  await sendEmail({
-    to: normalizedEmail,
-    subject: "Verify Your Email & Activate Account",
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 6px;">
-        <h2 style="color: #0b7ad8; margin-bottom: 12px;">Welcome, ${fullName}!</h2>
-        <p style="color: #334155; font-size: 14px;">Thank you for creating an account. Please verify your email address by clicking the button below:</p>
-        <p style="margin: 22px 0;">
-          <a href="${activationLink}" style="background: #0b7ad8; color: #ffffff; padding: 12px 22px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
-            Verify Email Address
-          </a>
-        </p>
-        <p style="color: #64748b; font-size: 12px;">Or copy and paste this link in your browser:<br/>${activationLink}</p>
-        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 18px 0;" />
-        <p style="color: #64748b; font-size: 12px;">Note: After email verification, your account will remain pending until an admin assigns your role.</p>
-      </div>
-    `,
-  });
+  const activationLink = `${getFrontendUrl()}/verify-account?token=${rawActivationToken}`;
+
+  try {
+    await sendEmail({
+      to: normalizedEmail,
+      subject: "Verify Your Email & Activate Account",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 6px;">
+          <h2 style="color: #0b7ad8; margin-bottom: 12px;">Welcome, ${fullName}!</h2>
+          <p style="color: #334155; font-size: 14px;">Please verify your email address by clicking the button below:</p>
+          <p style="margin: 22px 0;">
+            <a href="${activationLink}" style="background: #0b7ad8; color: #ffffff; padding: 12px 22px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
+              Verify Email Address
+            </a>
+          </p>
+          <p style="color: #64748b; font-size: 12px;">Or copy this link:<br/>${activationLink}</p>
+          <p style="color: #64748b; font-size: 12px;">Note: Your account remains pending until admin assigns your role.</p>
+        </div>
+      `,
+    });
+  } catch (mailError: any) {
+    console.error("❌ Email send failed:", mailError?.message || mailError);
+    console.log("📧 [FALLBACK ACTIVATION LINK]:", activationLink);
+    throw new Error(
+      `Account saved in DB, but failed to send verification email: ${mailError?.message || "Mail error"}`
+    );
+  }
 
   return {
     requiresApproval: true,
@@ -187,7 +200,7 @@ const recoverAccountInDB = async (email: string) => {
     user.resetPasswordExpires = new Date(Date.now() + 30 * 60 * 1000);
     await user.save();
 
-    const recoveryLink = `${FRONTEND_URL}/reset-password?token=${rawResetToken}`;
+    const recoveryLink = `${getFrontendUrl()}/reset-password?token=${rawResetToken}`;
 
     await sendEmail({
       to: normalizedEmail,
