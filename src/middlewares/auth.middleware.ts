@@ -23,7 +23,9 @@ export const verifyJWT = (req: AuthRequest, res: Response, next: NextFunction) =
       });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as IJwtPayload;
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      algorithms: ["HS256"],
+    }) as IJwtPayload;
     req.user = decoded;
     next();
   } catch (error) {

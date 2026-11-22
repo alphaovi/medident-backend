@@ -21,24 +21,19 @@ const userSchema = new Schema<IUser>(
       default: "pending",
     },
     isActive: { type: Boolean, default: false },
+    isEmailVerified: { type: Boolean, default: false },
     activationToken: { type: String, default: null, select: false },
     activationExpires: { type: Date, default: null, select: false },
     resetPasswordToken: { type: String, default: null, select: false },
     resetPasswordExpires: { type: Date, default: null, select: false },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
-
-userSchema.methods.hashPassword = async function (plainPassword: string): Promise<string> {
-  const salt = await bcrypt.genSalt(10);
-  return await bcrypt.hash(plainPassword, salt);
-};
 
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
-  this.password = await this.hashPassword(this.password);
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
   next();
 });
 
