@@ -22,7 +22,6 @@ const signToken = (payload: IJwtPayload): string => {
   });
 };
 
-// 1. Create Account -> DB Save + Send Verification Email
 const registerUserIntoDB = async (payload: Partial<IUser>) => {
   const normalizedEmail = payload.email?.trim().toLowerCase();
   if (!normalizedEmail) throw new Error("Email is required");
@@ -59,35 +58,25 @@ const registerUserIntoDB = async (payload: Partial<IUser>) => {
     activationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
   });
 
-  console.log("✅ User saved in DB:", createdUser._id, createdUser.email);
-
   const activationLink = `${getFrontendUrl()}/verify-account?token=${rawActivationToken}`;
 
-  try {
-    await sendEmail({
-      to: normalizedEmail,
-      subject: "Verify Your Email & Activate Account",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 6px;">
-          <h2 style="color: #0b7ad8; margin-bottom: 12px;">Welcome, ${fullName}!</h2>
-          <p style="color: #334155; font-size: 14px;">Please verify your email address by clicking the button below:</p>
-          <p style="margin: 22px 0;">
-            <a href="${activationLink}" style="background: #0b7ad8; color: #ffffff; padding: 12px 22px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
-              Verify Email Address
-            </a>
-          </p>
-          <p style="color: #64748b; font-size: 12px;">Or copy this link:<br/>${activationLink}</p>
-          <p style="color: #64748b; font-size: 12px;">Note: Your account remains pending until admin assigns your role.</p>
-        </div>
-      `,
-    });
-  } catch (mailError: any) {
-    console.error("❌ Email send failed:", mailError?.message || mailError);
-    console.log("📧 [FALLBACK ACTIVATION LINK]:", activationLink);
-    throw new Error(
-      `Account saved in DB, but failed to send verification email: ${mailError?.message || "Mail error"}`
-    );
-  }
+  await sendEmail({
+    to: normalizedEmail,
+    subject: "Verify Your Email & Activate Account",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 6px;">
+        <h2 style="color: #0b7ad8; margin-bottom: 12px;">Welcome, ${fullName}!</h2>
+        <p style="color: #334155; font-size: 14px;">Please verify your email address by clicking the button below:</p>
+        <p style="margin: 22px 0;">
+          <a href="${activationLink}" style="background: #0b7ad8; color: #ffffff; padding: 12px 22px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
+            Verify Email Address
+          </a>
+        </p>
+        <p style="color: #64748b; font-size: 12px;">Or copy this link:<br/>${activationLink}</p>
+        <p style="color: #64748b; font-size: 12px;">Note: Your account remains pending until an admin assigns your role.</p>
+      </div>
+    `,
+  });
 
   return {
     requiresApproval: true,
@@ -105,7 +94,6 @@ const registerUserIntoDB = async (payload: Partial<IUser>) => {
   };
 };
 
-// 2. Verify Email Link
 const verifyAccountInDB = async (rawToken: string) => {
   if (!rawToken) throw new Error("Activation token is required");
 
@@ -147,7 +135,6 @@ const verifyAccountInDB = async (rawToken: string) => {
   };
 };
 
-// 3. Admin Approves & Assigns Role -> Auto isActive = true
 const approveUserAndAssignRoleInDB = async (userId: string, role: IAssignableRole) => {
   if (!ASSIGNABLE_ROLES.includes(role)) {
     throw new Error("Invalid role. Allowed roles: admin, manager, user");
@@ -168,7 +155,6 @@ const approveUserAndAssignRoleInDB = async (userId: string, role: IAssignableRol
   return await UserModel.findById(user._id).select("-password");
 };
 
-// 4. Admin Toggle isActive Later (true / false)
 const updateUserActiveStatusInDB = async (userId: string, isActive: boolean) => {
   const user = await UserModel.findById(userId);
   if (!user) throw new Error("User not found");
@@ -182,7 +168,6 @@ const updateUserActiveStatusInDB = async (userId: string, isActive: boolean) => 
   return await UserModel.findById(user._id).select("-password");
 };
 
-// 5. Account Recovery Email
 const recoverAccountInDB = async (email: string) => {
   const normalizedEmail = email?.trim().toLowerCase();
   if (!normalizedEmail) throw new Error("Email is required");
@@ -220,7 +205,6 @@ const recoverAccountInDB = async (email: string) => {
   };
 };
 
-// 6. Login (HS256 Token)
 const loginUserIntoDB = async (payload: { email: string; password: string }) => {
   const normalizedEmail = payload.email?.trim().toLowerCase();
   const user = await UserModel.findOne({ email: normalizedEmail }).select("+password");

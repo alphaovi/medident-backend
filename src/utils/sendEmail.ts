@@ -9,7 +9,7 @@ export const sendEmail = async (options: {
   const mailPass = process.env.MAIL_PASS?.replace(/\s+/g, "");
 
   if (!mailUser || !mailPass) {
-    throw new Error("MAIL_USER or MAIL_PASS is missing in .env file");
+    throw new Error("MAIL_USER or MAIL_PASS is missing in environment variables");
   }
 
   const transporter = nodemailer.createTransport({
@@ -27,6 +27,5 @@ export const sendEmail = async (options: {
     html: options.html,
   });
 
-  console.log("✅ Email sent:", info.messageId);
   return info;
 };
