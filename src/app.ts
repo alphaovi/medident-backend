@@ -15,6 +15,7 @@ import { StateRoutes } from "./modules/state/state.route.js";
 import { SellReturnRoutes } from "./modules/sellReturn/sellReturn.route.js";
 import { SalesOrderRoutes } from "./modules/salesOrder/salesOrder.route.js";
 import { BanksDetailRoutes } from "./modules/banksDetail/banksDetail.route.js";
+import { UserRoutes } from "./modules/user/user.route.js";
 
 const app: Application = express();
 
@@ -42,6 +43,8 @@ app.use("/api/v1/stock-adjustments", stockAdjustmentRoutes);
 app.use("/api/v1/states", StateRoutes);
 app.use("/api/v1/sell-returns", SellReturnRoutes);
 app.use("/api/v1/banks-detail",BanksDetailRoutes);
+app.use("/api/v1/users",UserRoutes);
+
 
 app.get("/", (req: Request, res: Response) => {
   res.status(200).send("Medident Backend is running successfully!");
