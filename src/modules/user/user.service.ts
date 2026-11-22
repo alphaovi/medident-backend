@@ -7,13 +7,52 @@ import { sendEmail } from "../../utils/sendEmail.js";
 
 const ASSIGNABLE_ROLES: IAssignableRole[] = ["admin", "manager", "user"];
 
+const ALLOWED_FRONTEND_ORIGINS = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "https://medidentbd.netlify.app",
+  "http://medidentbd.netlify.app",
+  "https://www.medidentbd.netlify.app",
+  "https://medidentbd.com",
+  "http://medidentbd.com",
+  "https://www.medidentbd.com",
+  "http://www.medidentbd.com",
+];
+
 const getJwtSecret = () =>
   process.env.JWT_SECRET || "medident_super_secret_hs256_key_2026";
 
 const getJwtExpiresIn = () => process.env.JWT_EXPIRES_IN || "7d";
 
-const getFrontendUrl = () =>
-  process.env.FRONTEND_URL || "http://localhost:5173";
+const cleanSingleUrl = (raw?: string | null): string | null => {
+  if (!raw) return null;
+  // Handle accidental "url1 || url2" or comma/space separated values in env
+  const firstPart = raw.split(/\|\||,|\s+/)[0]?.trim();
+  if (!firstPart) return null;
+
+  try {
+    const parsed = new URL(firstPart);
+    return parsed.origin.replace(/\/+$/, "");
+  } catch {
+    return null;
+  }
+};
+
+const resolveFrontendOrigin = (clientOrigin?: string): string => {
+  const cleanedClientOrigin = cleanSingleUrl(clientOrigin);
+  const envOrigin = cleanSingleUrl(process.env.FRONTEND_URL);
+
+  const allowedSet = new Set<string>(ALLOWED_FRONTEND_ORIGINS);
+  if (envOrigin) {
+    allowedSet.add(envOrigin);
+  }
+
+  if (cleanedClientOrigin && allowedSet.has(cleanedClientOrigin)) {
+    return cleanedClientOrigin;
+  }
+
+  return envOrigin || "https://medidentbd.netlify.app";
+};
 
 const signToken = (payload: IJwtPayload): string => {
   return jwt.sign(payload, getJwtSecret(), {
@@ -22,7 +61,10 @@ const signToken = (payload: IJwtPayload): string => {
   });
 };
 
-const registerUserIntoDB = async (payload: Partial<IUser>) => {
+// 1. Create Account -> DB Save + Send Verification Email
+const registerUserIntoDB = async (
+  payload: Partial<IUser> & { clientOrigin?: string }
+) => {
   const normalizedEmail = payload.email?.trim().toLowerCase();
   if (!normalizedEmail) throw new Error("Email is required");
   if (!payload.password) throw new Error("Password is required");
@@ -58,7 +100,8 @@ const registerUserIntoDB = async (payload: Partial<IUser>) => {
     activationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
   });
 
-  const activationLink = `${getFrontendUrl()}/verify-account?token=${rawActivationToken}`;
+  const targetOrigin = resolveFrontendOrigin(payload.clientOrigin);
+  const activationLink = `${targetOrigin}/verify-account?token=${rawActivationToken}`;
 
   await sendEmail({
     to: normalizedEmail,
@@ -94,6 +137,7 @@ const registerUserIntoDB = async (payload: Partial<IUser>) => {
   };
 };
 
+// 2. Verify Email Link
 const verifyAccountInDB = async (rawToken: string) => {
   if (!rawToken) throw new Error("Activation token is required");
 
@@ -135,6 +179,7 @@ const verifyAccountInDB = async (rawToken: string) => {
   };
 };
 
+// 3. Admin Approves & Assigns Role -> Auto isActive = true
 const approveUserAndAssignRoleInDB = async (userId: string, role: IAssignableRole) => {
   if (!ASSIGNABLE_ROLES.includes(role)) {
     throw new Error("Invalid role. Allowed roles: admin, manager, user");
@@ -155,6 +200,7 @@ const approveUserAndAssignRoleInDB = async (userId: string, role: IAssignableRol
   return await UserModel.findById(user._id).select("-password");
 };
 
+// 4. Admin Toggle isActive Later (true / false)
 const updateUserActiveStatusInDB = async (userId: string, isActive: boolean) => {
   const user = await UserModel.findById(userId);
   if (!user) throw new Error("User not found");
@@ -168,6 +214,7 @@ const updateUserActiveStatusInDB = async (userId: string, isActive: boolean) => 
   return await UserModel.findById(user._id).select("-password");
 };
 
+// 5. Account Recovery Email
 const recoverAccountInDB = async (email: string) => {
   const normalizedEmail = email?.trim().toLowerCase();
   if (!normalizedEmail) throw new Error("Email is required");
@@ -185,7 +232,7 @@ const recoverAccountInDB = async (email: string) => {
     user.resetPasswordExpires = new Date(Date.now() + 30 * 60 * 1000);
     await user.save();
 
-    const recoveryLink = `${getFrontendUrl()}/reset-password?token=${rawResetToken}`;
+    const recoveryLink = `${resolveFrontendOrigin()}/reset-password?token=${rawResetToken}`;
 
     await sendEmail({
       to: normalizedEmail,
@@ -205,6 +252,7 @@ const recoverAccountInDB = async (email: string) => {
   };
 };
 
+// 6. Login (HS256 Token)
 const loginUserIntoDB = async (payload: { email: string; password: string }) => {
   const normalizedEmail = payload.email?.trim().toLowerCase();
   const user = await UserModel.findOne({ email: normalizedEmail }).select("+password");
