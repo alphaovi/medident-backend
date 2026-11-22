@@ -11,5 +11,7 @@ router.post("/recover-account", UserControllers.recoverAccount);
 router.post("/login", UserControllers.loginUser);
 router.get("/me", verifyJWT, UserControllers.getMe);
 router.get("/", verifyJWT, UserControllers.getAllUsers);
+router.patch("/:id/approve", verifyJWT, UserControllers.approveUser);
+router.patch("/:id/status", verifyJWT, UserControllers.updateUserActiveStatus);
 
 export const UserRoutes = router;

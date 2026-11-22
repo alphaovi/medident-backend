@@ -1,6 +1,8 @@
 import { Document } from "mongoose";
 
-export type IUserRole = "admin" | "manager" | "staff" | "user";
+export type IUserRole = "pending" | "admin" | "manager" | "user";
+export type IAssignableRole = Exclude<IUserRole, "pending">;
+export type IUserStatus = "pending" | "approved" | "rejected";
 
 export type IUser = Document & {
   name: string;
@@ -10,6 +12,7 @@ export type IUser = Document & {
   phone?: string;
   password: string;
   role: IUserRole;
+  status: IUserStatus;
   isActive: boolean;
   activationToken?: string | null;
   activationExpires?: Date | null;

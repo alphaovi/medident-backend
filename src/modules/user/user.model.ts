@@ -12,8 +12,13 @@ const userSchema = new Schema<IUser>(
     password: { type: String, required: true, minlength: 6, select: false },
     role: {
       type: String,
-      enum: ["admin", "manager", "staff", "user"],
-      default: "user",
+      enum: ["pending", "admin", "manager", "user"],
+      default: "pending",
+    },
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
     },
     isActive: { type: Boolean, default: false },
     activationToken: { type: String, default: null, select: false },

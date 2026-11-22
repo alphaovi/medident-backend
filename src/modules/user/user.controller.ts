@@ -18,19 +18,55 @@ const registerUser = async (req: AuthRequest, res: Response, next: NextFunction)
   }
 };
 
+const approveUser = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+    const result = await UserServices.approveUserAndAssignRoleInDB(id, role);
+    return res.status(200).json({
+      success: true,
+      message: "User role assigned and account activated successfully",
+      data: result,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Failed to assign role",
+    });
+  }
+};
+
+const updateUserActiveStatus = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+    const result = await UserServices.updateUserActiveStatusInDB(id, Boolean(isActive));
+    return res.status(200).json({
+      success: true,
+      message: `User ${Boolean(isActive) ? "activated" : "deactivated"} successfully`,
+      data: result,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Failed to update active status",
+    });
+  }
+};
+
 const verifyAccount = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const token = (req.query.token || req.body?.token) as string;
     const result = await UserServices.verifyAccountInDB(token);
     return res.status(200).json({
       success: true,
-      message: result.message || "Account activated successfully",
+      message: result.message || "Account verified successfully",
       data: result,
     });
   } catch (error: any) {
     return res.status(400).json({
       success: false,
-      message: error.message || "Account activation failed",
+      message: error.message || "Account verification failed",
     });
   }
 };
@@ -99,6 +135,8 @@ const getAllUsers = async (req: AuthRequest, res: Response, next: NextFunction) 
 
 export const UserControllers = {
   registerUser,
+  approveUser,
+  updateUserActiveStatus,
   verifyAccount,
   recoverAccount,
   loginUser,
