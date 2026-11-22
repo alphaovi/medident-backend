@@ -15,10 +15,23 @@ export type ISaleOrderItem = {
   afterDiscount: number;
 };
 
+export type IPaymentBankSnapshot = {
+  bankName?: string;
+  accountNo?: string;
+  accountName?: string;
+  branch?: string;
+  details?: string;
+};
+
 export type IPaymentHistory = {
   date: Date;
   amount: number;
   paymentMethod?: string;
+  bankId?: Schema.Types.ObjectId | null;
+  bankDetails?: IPaymentBankSnapshot | null;
+  status?: string;
+  note?: string;
+  receipt?: string | null;
 };
 
 <<<<<<< HEAD

@@ -63,6 +63,21 @@ const updateSalesOrder = async (req: Request, res: Response, next: NextFunction)
   }
 };
 
+// 🟢 Add Payment Controller
+const addPaymentToSalesOrder = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const result = await SalesOrderServices.addPaymentToSalesOrderInDB(id, req.body);
+    return res.status(200).json({
+      success: true,
+      message: "Payment added to sales order successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // 5. Update Order Status Controller
 const updateOrderStatus = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -124,7 +139,8 @@ export const SalesOrderControllers = {
   getAllSalesOrders,
   getSingleSalesOrder,
   updateSalesOrder,
+  addPaymentToSalesOrder,
   updateOrderStatus,
   deleteSalesOrder,
-  getCustomerStatement
+  getCustomerStatement,
 };

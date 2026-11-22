@@ -15,10 +15,10 @@ const createProductSubgroup = async (req: Request, res: Response) => {
       message: "Product subgroup created successfully",
       data: result,
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: "Something went wrong",
+      message: error.message || "Something went wrong",
       error,
     });
   }
@@ -44,6 +44,7 @@ const getAllProductSubgroups = async (req: Request, res: Response) => {
     });
   }
 };
+
 const getSingleProductSubgroup = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -56,10 +57,10 @@ const getSingleProductSubgroup = async (req: Request, res: Response) => {
       message: "Product subgroup retrieved successfully",
       data: result,
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: "Something went wrong",
+      message: error.message || "Something went wrong",
       error,
     });
   }
@@ -81,10 +82,10 @@ const updateProductSubgroup = async (req: Request, res: Response) => {
       message: "Product subgroup updated successfully",
       data: result,
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: "Something went wrong",
+      message: error.message || "Something went wrong",
       error,
     });
   }
@@ -102,10 +103,10 @@ const deleteSingleProductSubgroup = async (req: Request, res: Response) => {
       message: "Product subgroup deleted successfully",
       data: result,
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: "Something went wrong",
+      message: error.message || "Something went wrong",
       error,
     });
   }

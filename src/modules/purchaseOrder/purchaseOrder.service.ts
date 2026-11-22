@@ -5,6 +5,11 @@ import { InventoryModel } from "../inventory/inventory.model.js";
 const createPurchaseOrderIntoDB = async (payload: any) => {
   const result = await PurchaseOrderModel.create(payload);
   
+  // 🟢 Strict Check: Status jodi "Ordered" ba empty/undefined hoy, tahole inventory-te kono stock ba transit add hobe na!
+  if (!result.status || result.status === "Ordered") {
+    return result;
+  }
+
   if (result.status === "On Transit" || result.status === "Received") {
     const productIds = result.items.map((item: any) => item.product);
     const inventories = await InventoryModel.find({ product: { $in: productIds } });
@@ -122,7 +127,9 @@ const updatePurchaseOrderInDB = async (purchaseId: string, payload: any) => {
 
   const inventoriesToSave: any[] = [];
 
-  if (currentStatus === "On Transit" && newStatus === "On Transit") {
+  if (currentStatus === "Ordered" && newStatus === "Ordered") {
+    // Kono inventory change hobe na
+  } else if (currentStatus === "On Transit" && newStatus === "On Transit") {
     const oldMap = new Map<string, number>();
     oldItems.forEach((i: any) => oldMap.set(String(i.product), (oldMap.get(String(i.product)) || 0) + Number(i.orderQuantity || 0)));
 
@@ -299,7 +306,6 @@ const deletePurchaseOrderFromDB = async (purchaseId: string) => {
   return result;
 };
 
-// আবশ্যিকভাবে এখানে PurchaseOrderServices নামে এক্সপোর্ট করা হয়েছে
 export const PurchaseOrderServices = {
   createPurchaseOrderIntoDB,
   getAllPurchaseOrdersFromDB,

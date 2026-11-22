@@ -3,20 +3,19 @@ import { ProductGroupServices } from "./productGroup.service.js";
 
 const createProductGroup = async (req: Request, res: Response) => {
   try {
-    const { productGroup } = req.body;
+    // ফ্রন্টএন্ড থেকে ডেটা সরাসরি বা নেস্টেড অবজেক্ট আকারে আসলেও যেন সেফলি রিসিভ হয়
+    const payload = req.body.productGroup || req.body;
 
-    const result =
-      await ProductGroupServices.createProductGroupIntoDB(productGroup);
-
+    const result = await ProductGroupServices.createProductGroupIntoDB(payload);
     res.status(201).json({
       success: true,
       message: "Product group created successfully",
       data: result,
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: "Something went wrong",
+      message: error.message || "Something went wrong",
       error,
     });
   }
@@ -24,18 +23,16 @@ const createProductGroup = async (req: Request, res: Response) => {
 
 const getAllProductGroups = async (req: Request, res: Response) => {
   try {
-    const result =
-      await ProductGroupServices.getAllProductGroupsFromDB();
-
+    const result = await ProductGroupServices.getAllProductGroupsFromDB();
     res.status(200).json({
       success: true,
       message: "Product groups retrieved successfully",
       data: result,
     });
   } catch (error: any) {
-    res.status(400).json({
+    res.status(500).json({
       success: false,
-      message: error.message,
+      message: error.message || "Something went wrong",
       error,
     });
   }
@@ -43,34 +40,27 @@ const getAllProductGroups = async (req: Request, res: Response) => {
 
 const getSingleProductGroup = async (req: Request, res: Response) => {
   try {
-    const id = req.params.id as string;
-
-    const result =
-      await ProductGroupServices.getSingleProductGroupFromDB(id);
-
+    const { id } = req.params;
+    const result = await ProductGroupServices.getSingleProductGroupFromDB(id);
     res.status(200).json({
       success: true,
       message: "Product group retrieved successfully",
       data: result,
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: "Something went wrong",
+      message: error.message || "Something went wrong",
       error,
     });
   }
 };
 
-// --- UPDATE CONTROLLER (PATCH) ---
 const updateProductGroup = async (req: Request, res: Response) => {
   try {
-    const id = req.params.id as string;
-    const { productGroup } = req.body;
-
-    const result =
-      await ProductGroupServices.updateProductGroupInDB(id, productGroup);
-
+    const { id } = req.params;
+    const payload = req.body.productGroup || req.body;
+    const result = await ProductGroupServices.updateProductGroupInDB(id, payload);
     res.status(200).json({
       success: true,
       message: "Product group updated successfully",
@@ -88,19 +78,17 @@ const updateProductGroup = async (req: Request, res: Response) => {
 const deleteSingleProductGroup = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-
-    const result =
-      await ProductGroupServices.deleteSingleProductGroupFromDB(id);
-
+    const result = await ProductGroupServices.deleteSingleProductGroupFromDB(id);
+    
     res.status(200).json({
       success: true,
       message: "Product group deleted successfully",
       data: result,
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: "Something went wrong",
+      message: error.message || "Something went wrong",
       error,
     });
   }

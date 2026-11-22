@@ -16,6 +16,7 @@ const saleItemValidationSchema = z.object({
 });
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 const productItemSchema = z.object({
 <<<<<<< HEAD
   state: z.string({ required_error: 'State is required' }),
@@ -52,10 +53,31 @@ export const createSaleOrderZodSchema = z.object({
   totalPrice: z.number().min(0).optional(),
   afterDiscount: z.number().min(0).optional()
 =======
+=======
+const paymentBankSnapshotValidationSchema = z
+  .object({
+    bankName: z.string().optional(),
+    accountNo: z.string().optional(),
+    accountName: z.string().optional(),
+    branch: z.string().optional(),
+    details: z.string().optional(),
+  })
+  .nullable()
+  .optional();
+
+>>>>>>> main
 const paymentValidationSchema = z.object({
   date: z.string().optional(),
   amount: z.number().min(0),
   paymentMethod: z.string().optional(),
+<<<<<<< HEAD
+>>>>>>> main
+=======
+  bankId: z.string().nullable().optional(),
+  bankDetails: paymentBankSnapshotValidationSchema,
+  status: z.string().optional(),
+  note: z.string().optional(),
+  receipt: z.string().nullable().optional(),
 >>>>>>> main
 });
 
@@ -105,6 +127,22 @@ export const validateZod = (schema: z.AnyZodObject) => {
 export const updateOrderStatusValidationSchema = z.object({
   body: z.object({
     status: z.enum(["pending", "approved", "delivered", "cancelled"]),
+  }),
+});
+<<<<<<< HEAD
+>>>>>>> main
+=======
+
+export const addOrderPaymentValidationSchema = z.object({
+  body: z.object({
+    amount: z.number().positive("Payment amount must be greater than 0"),
+    paymentMethod: z.string().optional(),
+    bankId: z.string().nullable().optional(),
+    bankDetails: paymentBankSnapshotValidationSchema,
+    status: z.string().optional(),
+    note: z.string().optional(),
+    receipt: z.string().nullable().optional(),
+    date: z.string().optional(),
   }),
 });
 >>>>>>> main
