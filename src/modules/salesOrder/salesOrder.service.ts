@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { InventoryModel } from "../inventory/inventory.model.js";
 import { SalesOrderModel } from "./salesOrder.model.js";
 import { BanksDetailModel } from "../banksDetail/banksDetail.model.js";
+import { BanksDetailServices } from "../banksDetail/banksDetail.service.js";
 
 /**
  * 🟢 Serial-wise Inventory Sync & Total Sell Update Logic (100% Guaranteed Fix)
@@ -135,17 +136,26 @@ const revertInventoryTotalSell = async (item: any) => {
   }
 };
 
-// 🟢 Helper: Build payment object (saves bank info only if paymentMethod !== "Cash")
+// 🟢 Helper: Build payment object (supports account deposit for both Cash and Bank when bankId is provided)
 const buildPaymentEntry = async (paymentPayload: any) => {
   const rawMethod = (paymentPayload.paymentMethod || "Cash").trim();
   const isCash = rawMethod.toLowerCase() === "cash";
+  const providedAccountId =
+    paymentPayload.bankId && mongoose.isValidObjectId(paymentPayload.bankId)
+      ? new mongoose.Types.ObjectId(paymentPayload.bankId)
+      : null;
 
-  if (isCash) {
+  let bankDoc: any = null;
+  if (providedAccountId) {
+    bankDoc = await BanksDetailModel.findById(providedAccountId);
+  }
+
+  if (isCash && !bankDoc) {
     return {
       date: paymentPayload.date ? new Date(paymentPayload.date) : new Date(),
       amount: Number(paymentPayload.amount) || 0,
       paymentMethod: "Cash",
-      bankId: null,
+      bankId: providedAccountId,
       bankDetails: null,
       status: paymentPayload.status || "Approved",
       note: paymentPayload.note || "",
@@ -153,16 +163,11 @@ const buildPaymentEntry = async (paymentPayload: any) => {
     };
   }
 
-  let bankDoc: any = null;
-  if (paymentPayload.bankId && mongoose.isValidObjectId(paymentPayload.bankId)) {
-    bankDoc = await BanksDetailModel.findById(paymentPayload.bankId);
-  }
-
   const snapshot = {
     bankName:
       paymentPayload.bankDetails?.bankName ||
       bankDoc?.bankName ||
-      rawMethod,
+      (isCash ? "Cash" : rawMethod),
     accountNo:
       paymentPayload.bankDetails?.accountNo ||
       bankDoc?.accountNo ||
@@ -184,11 +189,9 @@ const buildPaymentEntry = async (paymentPayload: any) => {
   return {
     date: paymentPayload.date ? new Date(paymentPayload.date) : new Date(),
     amount: Number(paymentPayload.amount) || 0,
-    paymentMethod: snapshot.bankName || rawMethod,
-    bankId: bankDoc?._id || (paymentPayload.bankId && mongoose.isValidObjectId(paymentPayload.bankId)
-      ? new mongoose.Types.ObjectId(paymentPayload.bankId)
-      : null),
-    bankDetails: snapshot,
+    paymentMethod: isCash ? "Cash" : snapshot.bankName || rawMethod,
+    bankId: bankDoc?._id || providedAccountId,
+    bankDetails: isCash && !paymentPayload.bankDetails ? null : snapshot,
     status: paymentPayload.status || "Approved",
     note: paymentPayload.note || "",
     receipt: paymentPayload.receipt || null,
@@ -205,6 +208,21 @@ const createSalesOrderIntoDB = async (payload: any) => {
   }
 
   const createdOrder = await SalesOrderModel.create(orderData);
+
+  // 🟢 Deposit balance & transaction into selected Cash or Bank account
+  if (Array.isArray(createdOrder.payments) && createdOrder.payments.length > 0) {
+    for (const payment of createdOrder.payments) {
+      if (payment.bankId && Number(payment.amount) > 0) {
+        await BanksDetailServices.recordSalesDepositIntoBank({
+          bankId: payment.bankId,
+          amount: Number(payment.amount),
+          date: payment.date,
+          referenceId: createdOrder._id,
+          note: payment.note || "Sales order payment deposit",
+        });
+      }
+    }
+  }
 
   const productsList = orderData.products || createdOrder.products || [];
   if (Array.isArray(productsList)) {
@@ -239,7 +257,7 @@ const getSingleSalesOrderFromDB = async (id: string) => {
 const updateSalesOrderIntoDB = async (id: string, payload: any) => {
   const orderData = payload.saleOrder || payload;
   const existingOrder = await SalesOrderModel.findById(id);
-  
+
   if (!existingOrder) {
     throw new Error("Sales order not found for update");
   }
@@ -290,6 +308,17 @@ const addPaymentToSalesOrderInDB = async (id: string, paymentPayload: any) => {
   order.paidAmount = (Number(order.paidAmount) || 0) + amount;
 
   await order.save(); // pre("save") automatically recalculates grandTotal & dueAmount
+
+  // 🟢 Deposit balance & transaction when payment is added to a Cash or Bank account
+  if (paymentEntry.bankId && amount > 0) {
+    await BanksDetailServices.recordSalesDepositIntoBank({
+      bankId: paymentEntry.bankId,
+      amount,
+      date: paymentEntry.date,
+      referenceId: order._id,
+      note: paymentEntry.note || "Sales order payment deposit",
+    });
+  }
 
   return await SalesOrderModel.findById(id)
     .populate("customer")
