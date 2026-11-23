@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { BanksDetailModel } from "./banksDetail.model.js";
 import { IBanksDetail } from "./banksDetail.interface.js";
 import { IJwtPayload } from "../user/user.interface.js";
+import { UserModel } from "../user/user.model.js";
 
 const createErrorWithStatus = (message: string, statusCode: number) => {
   const err: any = new Error(message);
@@ -21,6 +22,24 @@ const ensureOwnershipOrAdmin = (bankDoc: IBanksDetail, requester: IJwtPayload) =
   }
 };
 
+const resolveTargetOwnerId = async (requestedUserId: any, requester: IJwtPayload) => {
+  const isAdmin = requester.role?.toLowerCase() === "admin";
+  if (!isAdmin || !requestedUserId) {
+    return requester.userId;
+  }
+
+  if (!mongoose.isValidObjectId(requestedUserId)) {
+    throw createErrorWithStatus("Invalid target user ID", 400);
+  }
+
+  const targetUser = await UserModel.findById(requestedUserId).select("_id");
+  if (!targetUser) {
+    throw createErrorWithStatus("Selected owner user not found", 404);
+  }
+
+  return targetUser._id;
+};
+
 const createBankDetailIntoDB = async (
   payload: Partial<IBanksDetail>,
   requester: IJwtPayload
@@ -28,9 +47,11 @@ const createBankDetailIntoDB = async (
   const isCash = payload.bankName?.trim().toLowerCase() === "cash";
   const { user, currentBalance, transactions, ...rest } = payload as any;
 
+  const ownerId = await resolveTargetOwnerId(user, requester);
+
   const dataToCreate = {
     ...rest,
-    user: requester.userId,
+    user: ownerId,
     bankName: isCash ? "Cash" : payload.bankName?.trim(),
     accountNo: isCash ? payload.accountNo?.trim() || "" : payload.accountNo?.trim(),
     currentBalance: 0,
@@ -89,6 +110,12 @@ const updateBankDetailIntoDB = async (
   ensureOwnershipOrAdmin(existingBank, requester);
 
   const { user, currentBalance, transactions, ...safePayload } = payload as any;
+  const isAdmin = requester.role?.toLowerCase() === "admin";
+
+  // অ্যাডমিন যদি এডিট করার সময় ওনার (user) পরিবর্তন করে, তবে সেটি আপডেট হবে
+  if (isAdmin && user) {
+    safePayload.user = await resolveTargetOwnerId(user, requester);
+  }
 
   const targetBankName = (safePayload.bankName ?? existingBank.bankName)?.trim();
   const isCash = targetBankName?.toLowerCase() === "cash";
