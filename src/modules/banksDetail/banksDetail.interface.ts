@@ -1,4 +1,4 @@
-import { Document, Schema } from "mongoose";
+import { Document, Schema, Types } from "mongoose";
 
 export type IBankTransactionType = "deposit" | "transfer_in" | "transfer_out";
 export type IBankTransactionDirection = "in" | "out";
@@ -16,6 +16,7 @@ export type IBankTransaction = {
 };
 
 export type IBanksDetail = Document & {
+  user: Types.ObjectId;
   bankName: string;
   accountNo?: string;
   accountName: string;

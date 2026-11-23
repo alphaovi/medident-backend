@@ -26,6 +26,12 @@ const bankTransactionSchema = new Schema<IBankTransaction>(
 
 const banksDetailSchema = new Schema<IBanksDetail>(
   {
+    user: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
     bankName: { type: String, required: true, trim: true },
     accountNo: {
       type: String,

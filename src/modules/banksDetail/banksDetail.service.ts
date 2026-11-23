@@ -1,49 +1,135 @@
 import mongoose from "mongoose";
 import { BanksDetailModel } from "./banksDetail.model.js";
 import { IBanksDetail } from "./banksDetail.interface.js";
+import { IJwtPayload } from "../user/user.interface.js";
 
-const createBankDetailIntoDB = async (payload: Partial<IBanksDetail>) => {
+const createErrorWithStatus = (message: string, statusCode: number) => {
+  const err: any = new Error(message);
+  err.statusCode = statusCode;
+  return err;
+};
+
+const ensureOwnershipOrAdmin = (bankDoc: IBanksDetail, requester: IJwtPayload) => {
+  const isAdmin = requester.role?.toLowerCase() === "admin";
+  const ownerId =
+    typeof bankDoc.user === "object" && bankDoc.user !== null && "_id" in bankDoc.user
+      ? String((bankDoc.user as any)._id)
+      : String(bankDoc.user);
+
+  if (!isAdmin && ownerId !== String(requester.userId)) {
+    throw createErrorWithStatus("Forbidden: You do not have permission to access this bank detail", 403);
+  }
+};
+
+const createBankDetailIntoDB = async (
+  payload: Partial<IBanksDetail>,
+  requester: IJwtPayload
+) => {
   const isCash = payload.bankName?.trim().toLowerCase() === "cash";
+  const { user, currentBalance, transactions, ...rest } = payload as any;
+
   const dataToCreate = {
-    ...payload,
+    ...rest,
+    user: requester.userId,
     bankName: isCash ? "Cash" : payload.bankName?.trim(),
     accountNo: isCash ? payload.accountNo?.trim() || "" : payload.accountNo?.trim(),
     currentBalance: 0,
     transactions: [],
   };
-  return await BanksDetailModel.create(dataToCreate);
+
+  const created = await BanksDetailModel.create(dataToCreate);
+  return await created.populate("user", "name email role");
 };
 
-const getAllBankDetailsFromDB = async () => {
-  return await BanksDetailModel.find()
+const getAllBankDetailsFromDB = async (requester: IJwtPayload) => {
+  const isAdmin = requester.role?.toLowerCase() === "admin";
+  const filter = isAdmin ? {} : { user: requester.userId };
+
+  return await BanksDetailModel.find(filter)
+    .populate("user", "name email role")
     .populate("transactions.bankAccount", "bankName accountNo accountName")
     .populate("transactions.fromAccount", "bankName accountNo accountName")
     .populate("transactions.toAccount", "bankName accountNo accountName")
     .sort({ createdAt: -1 });
 };
 
-const getSingleBankDetailFromDB = async (id: string) => {
-  return await BanksDetailModel.findById(id)
+const getSingleBankDetailFromDB = async (id: string, requester: IJwtPayload) => {
+  if (!mongoose.isValidObjectId(id)) {
+    throw createErrorWithStatus("Invalid bank detail ID", 400);
+  }
+
+  const bankDoc = await BanksDetailModel.findById(id)
+    .populate("user", "name email role")
     .populate("transactions.bankAccount", "bankName accountNo accountName")
     .populate("transactions.fromAccount", "bankName accountNo accountName")
     .populate("transactions.toAccount", "bankName accountNo accountName");
+
+  if (!bankDoc) {
+    throw createErrorWithStatus("Bank detail not found", 404);
+  }
+
+  ensureOwnershipOrAdmin(bankDoc, requester);
+  return bankDoc;
 };
 
-const updateBankDetailIntoDB = async (id: string, payload: Partial<IBanksDetail>) => {
-  const { currentBalance, transactions, ...safePayload } = payload as any;
-  if (safePayload.bankName && safePayload.bankName.trim().toLowerCase() === "cash") {
+const updateBankDetailIntoDB = async (
+  id: string,
+  payload: Partial<IBanksDetail>,
+  requester: IJwtPayload
+) => {
+  if (!mongoose.isValidObjectId(id)) {
+    throw createErrorWithStatus("Invalid bank detail ID", 400);
+  }
+
+  const existingBank = await BanksDetailModel.findById(id);
+  if (!existingBank) {
+    throw createErrorWithStatus("Bank detail not found", 404);
+  }
+
+  ensureOwnershipOrAdmin(existingBank, requester);
+
+  const { user, currentBalance, transactions, ...safePayload } = payload as any;
+
+  const targetBankName = (safePayload.bankName ?? existingBank.bankName)?.trim();
+  const isCash = targetBankName?.toLowerCase() === "cash";
+
+  if (isCash) {
     safePayload.bankName = "Cash";
-    if (safePayload.accountNo === undefined) {
-      safePayload.accountNo = "";
+    if (safePayload.accountNo !== undefined) {
+      safePayload.accountNo = safePayload.accountNo.trim();
+    }
+  } else {
+    const nextAccountNo =
+      safePayload.accountNo !== undefined
+        ? safePayload.accountNo.trim()
+        : existingBank.accountNo?.trim();
+
+    if (!nextAccountNo) {
+      throw createErrorWithStatus("Account number is required for non-cash accounts", 400);
+    }
+    if (safePayload.accountNo !== undefined) {
+      safePayload.accountNo = nextAccountNo;
     }
   }
+
   return await BanksDetailModel.findByIdAndUpdate(id, safePayload, {
     new: true,
     runValidators: true,
-  });
+  }).populate("user", "name email role");
 };
 
-const deleteBankDetailFromDB = async (id: string) => {
+const deleteBankDetailFromDB = async (id: string, requester: IJwtPayload) => {
+  if (!mongoose.isValidObjectId(id)) {
+    throw createErrorWithStatus("Invalid bank detail ID", 400);
+  }
+
+  const existingBank = await BanksDetailModel.findById(id);
+  if (!existingBank) {
+    throw createErrorWithStatus("Bank detail not found", 404);
+  }
+
+  ensureOwnershipOrAdmin(existingBank, requester);
+
   return await BanksDetailModel.findByIdAndDelete(id);
 };
 
