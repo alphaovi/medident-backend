@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { IJwtPayload } from "../modules/user/user.interface.js";
+import { getJwtSecret } from "../app/config/jwt.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your_super_secret_jwt_key_change_in_prod";
 
 export interface AuthRequest extends Request {
   user?: IJwtPayload;
@@ -23,7 +23,7 @@ export const verifyJWT = (req: AuthRequest, res: Response, next: NextFunction) =
       });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET, {
+    const decoded = jwt.verify(token, getJwtSecret(), {
       algorithms: ["HS256"],
     }) as IJwtPayload;
     req.user = decoded;

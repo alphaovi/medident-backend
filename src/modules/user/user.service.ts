@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { UserModel } from "./user.model.js";
 import { IAssignableRole, IJwtPayload, IUser } from "./user.interface.js";
 import { sendEmail } from "../../utils/sendEmail.js";
+import { getJwtExpiresIn, getJwtSecret } from "../../app/config/jwt.js";
 
 const ASSIGNABLE_ROLES: IAssignableRole[] = ["admin", "manager", "user"];
 
@@ -18,11 +19,6 @@ const ALLOWED_FRONTEND_ORIGINS = [
   "https://www.medidentbd.com",
   "http://www.medidentbd.com",
 ];
-
-const getJwtSecret = () =>
-  process.env.JWT_SECRET || "medident_super_secret_hs256_key_2026";
-
-const getJwtExpiresIn = () => process.env.JWT_EXPIRES_IN || "7d";
 
 const cleanSingleUrl = (raw?: string | null): string | null => {
   if (!raw) return null;
@@ -57,7 +53,7 @@ const resolveFrontendOrigin = (clientOrigin?: string): string => {
 const signToken = (payload: IJwtPayload): string => {
   return jwt.sign(payload, getJwtSecret(), {
     algorithm: "HS256",
-    expiresIn: getJwtExpiresIn() as jwt.SignOptions["expiresIn"],
+    expiresIn: getJwtExpiresIn(),
   });
 };
 
