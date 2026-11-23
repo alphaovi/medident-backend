@@ -7,6 +7,7 @@ import {
   loginUserValidationSchema,
   recoverAccountValidationSchema,
   registerUserValidationSchema,
+  updateProfileValidationSchema,
   updateUserActiveStatusValidationSchema,
 } from "./user.validation.js";
 
@@ -35,6 +36,18 @@ router.post(
 );
 router.get("/me", verifyJWT, UserControllers.getMe);
 router.get("/", verifyJWT, UserControllers.getAllUsers);
+router.patch(
+  "/me",
+  verifyJWT,
+  validateRequest(updateProfileValidationSchema),
+  UserControllers.updateMe
+);
+router.patch(
+  "/:id",
+  verifyJWT,
+  validateRequest(updateProfileValidationSchema),
+  UserControllers.updateUserById
+);
 router.patch(
   "/:id/approve",
   verifyJWT,

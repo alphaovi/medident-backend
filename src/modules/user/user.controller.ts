@@ -133,6 +133,49 @@ const getAllUsers = async (req: AuthRequest, res: Response, next: NextFunction) 
   }
 };
 
+const updateMe = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user?.userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+    const result = await UserServices.updateUserProfileInDB(
+      req.user.userId,
+      req.body,
+      req.user
+    );
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      data: result,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Failed to update profile",
+    });
+  }
+};
+
+const updateUserById = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user?.userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+    const { id } = req.params;
+    const result = await UserServices.updateUserProfileInDB(id, req.body, req.user);
+    return res.status(200).json({
+      success: true,
+      message: "User updated successfully",
+      data: result,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Failed to update user",
+    });
+  }
+};
+
 export const UserControllers = {
   registerUser,
   approveUser,
@@ -142,4 +185,6 @@ export const UserControllers = {
   loginUser,
   getMe,
   getAllUsers,
+  updateMe,
+  updateUserById,
 };

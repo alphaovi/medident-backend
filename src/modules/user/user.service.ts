@@ -305,6 +305,38 @@ const getAllUsersFromDB = async () => {
   return await UserModel.find().select("-password").sort({ createdAt: -1 });
 };
 
+const updateUserProfileInDB = async (
+  targetUserId: string,
+  payload: Partial<IUser>,
+  requester: IJwtPayload
+) => {
+  const isSelf = String(requester.userId) === String(targetUserId);
+  const isAdmin = requester.role === "admin";
+
+  if (!isSelf && !isAdmin) {
+    throw new Error("Forbidden: You can only update your own profile");
+  }
+
+  const user = await UserModel.findById(targetUserId);
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  if (payload.firstName !== undefined) user.firstName = payload.firstName.trim();
+  if (payload.lastName !== undefined) user.lastName = payload.lastName.trim();
+  if (payload.phone !== undefined) user.phone = payload.phone.trim();
+
+  if (payload.name !== undefined && payload.name.trim()) {
+    user.name = payload.name.trim();
+  } else if (payload.firstName !== undefined || payload.lastName !== undefined) {
+    const combined = `${user.firstName || ""} ${user.lastName || ""}`.trim();
+    if (combined) user.name = combined;
+  }
+
+  await user.save();
+  return await UserModel.findById(user._id).select("-password");
+};
+
 export const UserServices = {
   registerUserIntoDB,
   verifyAccountInDB,
@@ -314,4 +346,5 @@ export const UserServices = {
   loginUserIntoDB,
   getMeFromDB,
   getAllUsersFromDB,
+  updateUserProfileInDB,
 };

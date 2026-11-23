@@ -49,3 +49,12 @@ export const recoverAccountValidationSchema = z.object({
       .email("Valid email is required"),
   }),
 });
+
+export const updateProfileValidationSchema = z.object({
+  body: z.object({
+    name: z.string().trim().min(1).optional(),
+    firstName: z.string().trim().optional(),
+    lastName: z.string().trim().optional(),
+    phone: z.string().trim().optional(),
+  }),
+});
