@@ -112,7 +112,6 @@ const updateBankDetailIntoDB = async (
   const { user, currentBalance, transactions, ...safePayload } = payload as any;
   const isAdmin = requester.role?.toLowerCase() === "admin";
 
-  // অ্যাডমিন যদি এডিট করার সময় ওনার (user) পরিবর্তন করে, তবে সেটি আপডেট হবে
   if (isAdmin && user) {
     safePayload.user = await resolveTargetOwnerId(user, requester);
   }
@@ -160,7 +159,7 @@ const deleteBankDetailFromDB = async (id: string, requester: IJwtPayload) => {
   return await BanksDetailModel.findByIdAndDelete(id);
 };
 
-// 🟢 Transfer balance between any two accounts (Cash or Bank/bKash etc.)
+// Transfer balance between any two accounts (Cash or Bank/bKash etc.)
 const transferBalanceBetweenBanksInDB = async (payload: {
   fromBankId: string;
   toBankId: string;
@@ -248,7 +247,7 @@ const transferBalanceBetweenBanksInDB = async (payload: {
   };
 };
 
-// 🟢 Deposit from Sales Order payment into Cash or Bank account
+// Deposit from Sales Order payment into Cash or Bank account
 const recordSalesDepositIntoBank = async (params: {
   bankId: any;
   amount: number;
@@ -279,6 +278,85 @@ const recordSalesDepositIntoBank = async (params: {
   await bankDoc.save();
 };
 
+// Deduct expense amount from bank/cash account
+const recordExpenseOutFromBank = async (params: {
+  bankId: any;
+  amount: number;
+  date?: Date;
+  referenceId?: any;
+  note?: string;
+}) => {
+  const { bankId, amount, date, referenceId, note } = params;
+  const expenseAmount = Number(amount);
+
+  if (!mongoose.isValidObjectId(bankId)) {
+    throw createErrorWithStatus("Invalid paidFrom bank account ID", 400);
+  }
+  if (!expenseAmount || expenseAmount <= 0) {
+    throw createErrorWithStatus("Expense amount must be greater than 0", 400);
+  }
+
+  const bankDoc = await BanksDetailModel.findById(bankId);
+  if (!bankDoc) {
+    throw createErrorWithStatus("PaidFrom account not found", 404);
+  }
+
+  const availableBalance = Number(bankDoc.currentBalance) || 0;
+  if (expenseAmount > availableBalance) {
+    throw createErrorWithStatus(
+      `Insufficient balance in ${bankDoc.bankName} (${bankDoc.accountName}). Available: ${availableBalance}, Required: ${expenseAmount}`,
+      400
+    );
+  }
+
+  bankDoc.currentBalance = availableBalance - expenseAmount;
+  bankDoc.transactions.push({
+    bankAccount: bankDoc._id as any,
+    type: "expense",
+    direction: "out",
+    amount: expenseAmount,
+    date: date || new Date(),
+    fromAccount: bankDoc._id as any,
+    toAccount: null,
+    referenceId: referenceId || null,
+    note: note || "Expense recorded",
+  });
+
+  await bankDoc.save();
+  return bankDoc;
+};
+
+// Refund/rollback expense amount into bank/cash account
+const refundExpenseIntoBank = async (params: {
+  bankId: any;
+  amount: number;
+  date?: Date;
+  referenceId?: any;
+  note?: string;
+}) => {
+  const { bankId, amount, date, referenceId, note } = params;
+  const refundAmount = Number(amount);
+  if (!bankId || !refundAmount || refundAmount <= 0) return;
+
+  const bankDoc = await BanksDetailModel.findById(bankId);
+  if (!bankDoc) return;
+
+  bankDoc.currentBalance = (Number(bankDoc.currentBalance) || 0) + refundAmount;
+  bankDoc.transactions.push({
+    bankAccount: bankDoc._id as any,
+    type: "deposit",
+    direction: "in",
+    amount: refundAmount,
+    date: date || new Date(),
+    fromAccount: null,
+    toAccount: bankDoc._id as any,
+    referenceId: referenceId || null,
+    note: note || "Expense reversed/deleted adjustment",
+  });
+
+  await bankDoc.save();
+};
+
 export const BanksDetailServices = {
   createBankDetailIntoDB,
   getAllBankDetailsFromDB,
@@ -287,4 +365,6 @@ export const BanksDetailServices = {
   deleteBankDetailFromDB,
   transferBalanceBetweenBanksInDB,
   recordSalesDepositIntoBank,
+  recordExpenseOutFromBank,
+  refundExpenseIntoBank,
 };

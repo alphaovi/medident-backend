@@ -1,6 +1,11 @@
 import { Document, Schema, Types } from "mongoose";
 
-export type IBankTransactionType = "deposit" | "transfer_in" | "transfer_out";
+export type IBankTransactionType =
+  | "deposit"
+  | "transfer_in"
+  | "transfer_out"
+  | "expense";
+
 export type IBankTransactionDirection = "in" | "out";
 
 export type IBankTransaction = {

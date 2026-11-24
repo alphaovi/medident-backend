@@ -6,7 +6,7 @@ const bankTransactionSchema = new Schema<IBankTransaction>(
     bankAccount: { type: Schema.Types.ObjectId, ref: "BanksDetail", required: true },
     type: {
       type: String,
-      enum: ["deposit", "transfer_in", "transfer_out"],
+      enum: ["deposit", "transfer_in", "transfer_out", "expense"],
       required: true,
     },
     direction: {
