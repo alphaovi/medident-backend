@@ -7,6 +7,8 @@ const objectIdSchema = z
     message: "Invalid MongoDB ObjectId",
   });
 
+const expenseStatusSchema = z.enum(["pending", "hold", "approve"]);
+
 export const createExpenseValidationSchema = z.object({
   body: z.object({
     date: z
@@ -23,6 +25,7 @@ export const createExpenseValidationSchema = z.object({
       .number({ required_error: "Amount is required" })
       .positive("Amount must be greater than 0"),
     notes: z.string().trim().optional().default(""),
+    status: expenseStatusSchema.optional().default("pending"),
   }),
 });
 
@@ -43,5 +46,15 @@ export const updateExpenseValidationSchema = z.object({
     paidFrom: objectIdSchema.optional(),
     amount: z.coerce.number().positive("Amount must be greater than 0").optional(),
     notes: z.string().trim().optional(),
+    status: expenseStatusSchema.optional(),
+  }),
+});
+
+export const updateExpenseStatusValidationSchema = z.object({
+  params: z.object({
+    id: objectIdSchema,
+  }),
+  body: z.object({
+    status: expenseStatusSchema,
   }),
 });

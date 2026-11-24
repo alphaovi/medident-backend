@@ -23,10 +23,33 @@ const getAllExpenses = async (req: AuthRequest, res: Response, next: NextFunctio
     if (!req.user) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
-    const result = await ExpenseServices.getAllExpensesFromDB(req.user);
+    const result = await ExpenseServices.getAllExpensesFromDB(req.user, req.query);
     return res.status(200).json({
       success: true,
       message: "Expenses fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getApprovedExpenseReports = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+    const result = await ExpenseServices.getApprovedExpenseReportsFromDB(
+      req.user,
+      req.query
+    );
+    return res.status(200).json({
+      success: true,
+      message: "Approved expense reports fetched successfully",
       data: result,
     });
   } catch (error) {
@@ -43,6 +66,30 @@ const getSingleExpense = async (req: AuthRequest, res: Response, next: NextFunct
     return res.status(200).json({
       success: true,
       message: "Expense fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateExpenseStatus = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+    const result = await ExpenseServices.updateExpenseStatusIntoDB(
+      req.params.id,
+      req.body.status,
+      req.user
+    );
+    return res.status(200).json({
+      success: true,
+      message: `Expense status updated to ${req.body.status}`,
       data: result,
     });
   } catch (error) {
@@ -89,7 +136,9 @@ const deleteExpense = async (req: AuthRequest, res: Response, next: NextFunction
 export const ExpenseControllers = {
   createExpense,
   getAllExpenses,
+  getApprovedExpenseReports,
   getSingleExpense,
+  updateExpenseStatus,
   updateExpense,
   deleteExpense,
 };

@@ -40,6 +40,21 @@ const expenseSchema = new Schema<IExpense>(
       default: "",
       trim: true,
     },
+    status: {
+      type: String,
+      enum: ["pending", "hold", "approve"],
+      default: "pending",
+      index: true,
+    },
+    approvedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    approvedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );
