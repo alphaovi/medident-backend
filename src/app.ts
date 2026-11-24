@@ -16,6 +16,8 @@ import { SellReturnRoutes } from "./modules/sellReturn/sellReturn.route.js";
 import { SalesOrderRoutes } from "./modules/salesOrder/salesOrder.route.js";
 import { BanksDetailRoutes } from "./modules/banksDetail/banksDetail.route.js";
 import { UserRoutes } from "./modules/user/user.route.js";
+import { ExpenseGroupRoutes } from "./modules/expenseGroup/expenseGroup.route.js";
+import { ExpenseTypeRoutes } from "./modules/expenseType/expenseType.route.js";
 
 const app: Application = express();
 
@@ -44,6 +46,8 @@ app.use("/api/v1/states", StateRoutes);
 app.use("/api/v1/sell-returns", SellReturnRoutes);
 app.use("/api/v1/banks-detail",BanksDetailRoutes);
 app.use("/api/v1/users",UserRoutes);
+app.use("/api/v1/expense-group",ExpenseGroupRoutes);
+app.use("/api/v1/expense-type", ExpenseTypeRoutes);
 
 
 app.get("/", (req: Request, res: Response) => {
