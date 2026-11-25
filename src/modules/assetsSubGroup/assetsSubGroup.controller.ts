@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import mongoose from "mongoose";
 import { AssetsSubGroupService } from "./assetsSubGroup.service.js";
 
 const createAssetSubGroup = async (req: Request, res: Response) => {
@@ -40,6 +41,13 @@ const getAllAssetSubGroups = async (req: Request, res: Response) => {
 const getSingleAssetSubGroup = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({
+        success: false,
+        message: "Asset sub-group not found",
+      });
+    }
+
     const result = await AssetsSubGroupService.getSingleAssetSubGroupFromDB(id);
 
     if (!result) {
@@ -65,6 +73,14 @@ const getSingleAssetSubGroup = async (req: Request, res: Response) => {
 const getSubGroupsByGroup = async (req: Request, res: Response) => {
   try {
     const { groupId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(groupId)) {
+      return res.status(200).json({
+        success: true,
+        message: "No sub-groups found for invalid group ID",
+        data: [],
+      });
+    }
+
     const result =
       await AssetsSubGroupService.getSubGroupsByGroupIdFromDB(groupId);
 
@@ -84,6 +100,13 @@ const getSubGroupsByGroup = async (req: Request, res: Response) => {
 const updateAssetSubGroup = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({
+        success: false,
+        message: "Asset sub-group not found",
+      });
+    }
+
     const result = await AssetsSubGroupService.updateAssetSubGroupIntoDB(
       id,
       req.body
@@ -112,6 +135,13 @@ const updateAssetSubGroup = async (req: Request, res: Response) => {
 const deleteAssetSubGroup = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({
+        success: false,
+        message: "Asset sub-group not found",
+      });
+    }
+
     const result = await AssetsSubGroupService.deleteAssetSubGroupFromDB(id);
 
     if (!result) {
