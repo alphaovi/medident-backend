@@ -22,6 +22,7 @@ import { ExpenseRoutes } from "./modules/expense/expense.route.js";
 import { AssetsGroupRoutes } from "./modules/assetsGroup/assetsGroup.route.js";
 import { AssetsSubGroupRoutes } from "./modules/assetsSubGroup/assetsSubGroup.route.js";
 import { AssetsSellRoutes } from "./modules/assetsSell/assetsSell.route.js";
+import { AssetsRoutes } from "./modules/assets/assets.route.js";
 
 const app: Application = express();
 
@@ -53,6 +54,7 @@ app.use("/api/v1/users",UserRoutes);
 app.use("/api/v1/expense", ExpenseRoutes);
 app.use("/api/v1/expense-group",ExpenseGroupRoutes);
 app.use("/api/v1/expense-type", ExpenseTypeRoutes);
+app.use("/api/v1/assets", AssetsRoutes);
 app.use("/api/v1/assets-group", AssetsGroupRoutes);
 app.use("/api/v1/assets-sub-group", AssetsSubGroupRoutes);
 app.use("/api/v1/assets-sell", AssetsSellRoutes);
