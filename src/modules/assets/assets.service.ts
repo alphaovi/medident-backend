@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import {
   IAssetItem,
   IAssets,
@@ -5,10 +6,21 @@ import {
   TDepreciationPeriod,
 } from "./assets.interface.js";
 import { Assets } from "./assets.model.js";
-import { AssetsGroup } from "../assetsGroup/assetsGroup.model.js"; // আপনার AssetsGroup ফাইলের পাথ ঠিক রাখুন
-import { AssetsSubGroup } from "../assetsSubGroup/assetsSubGroup.model.js"; // আপনার AssetsSubGroup ফাইলের পাথ ঠিক রাখুন
+import { AssetsGroup } from "../assetsGroup/assetsGroup.model.js";
+import { AssetsSubGroup } from "../assetsSubGroup/assetsSubGroup.model.js";
+import { UserModel } from "../user/user.model.js";
+import { BanksDetailModel } from "../banksDetail/banksDetail.model.js";
+import { BanksDetailServices } from "../banksDetail/banksDetail.service.js";
 
 const round2 = (num: number): number => Number(num.toFixed(2));
+
+const populateAssetsQuery = (query: any) =>
+  query.populate([
+    { path: "assetsGroup", select: "groupName" },
+    { path: "assetsSubGroup", select: "subGroupName groupId" },
+    { path: "paidBy", select: "name email role phone" },
+    { path: "paidFrom", select: "bankName accountNo accountName currentBalance user" },
+  ]);
 
 const calculateElapsedPeriods = (
   purchaseDate: Date | string | undefined,
@@ -155,21 +167,84 @@ const validateGroupAndSubGroup = async (
   }
 };
 
+const validateUserAndBankAccount = async (paidBy: unknown, paidFrom: unknown) => {
+  if (!paidBy || !mongoose.isValidObjectId(String(paidBy))) {
+    throw new Error("Valid user (paidBy) is required");
+  }
+  if (!paidFrom || !mongoose.isValidObjectId(String(paidFrom))) {
+    throw new Error("Valid bank/cash account (paidFrom) is required");
+  }
+
+  const userDoc = await UserModel.findById(paidBy).select("_id");
+  if (!userDoc) {
+    throw new Error("Selected user does not exist");
+  }
+
+  const bankDoc = await BanksDetailModel.findById(paidFrom);
+  if (!bankDoc) {
+    throw new Error("Selected bank/cash account does not exist");
+  }
+
+  const bankOwnerId =
+    typeof bankDoc.user === "object" && bankDoc.user !== null && "_id" in bankDoc.user
+      ? String((bankDoc.user as any)._id)
+      : String(bankDoc.user);
+
+  if (bankOwnerId !== String(userDoc._id)) {
+    throw new Error("Selected bank account does not belong to the selected user");
+  }
+};
+
 const createAssetsIntoDB = async (payload: IAssets) => {
   await validateGroupAndSubGroup(payload.assetsGroup, payload.assetsSubGroup);
 
+  if (payload.paidBy && payload.paidFrom) {
+    await validateUserAndBankAccount(payload.paidBy, payload.paidFrom);
+  } else if (payload.paidFrom) {
+    const bankDoc = await BanksDetailModel.findById(payload.paidFrom);
+    if (!bankDoc) {
+      throw new Error("Selected bank/cash account does not exist");
+    }
+  }
+
   const calculated = calculateAssetsData(payload.assets || []);
+  const firstPurchaseDate = calculated.assets[0]?.purchaseDate
+    ? new Date(calculated.assets[0].purchaseDate)
+    : new Date();
+  const itemNames = calculated.assets.map((a) => a.assetName).join(", ");
 
-  const created = await Assets.create({
-    assetsGroup: payload.assetsGroup,
-    assetsSubGroup: payload.assetsSubGroup,
-    ...calculated,
-  });
+  // 1. ব্যাংক অ্যাকাউন্ট সিলেক্ট করা থাকলে ওই অ্যাকাউন্ট থেকে টাকা মাইনাস (-) হবে এবং ব্যাংক স্টেটমেন্টে সেভ হবে
+  if (payload.paidFrom && calculated.grandTotalCost > 0) {
+    await BanksDetailServices.recordAssetPurchaseOutFromBank({
+      bankId: payload.paidFrom,
+      amount: calculated.grandTotalCost,
+      date: firstPurchaseDate,
+      note: `Asset Purchase: ${itemNames}`,
+    });
+  }
 
-  return await created.populate([
-    { path: "assetsGroup", select: "groupName" },
-    { path: "assetsSubGroup", select: "subGroupName groupId" },
-  ]);
+  try {
+    const created = await Assets.create({
+      assetsGroup: payload.assetsGroup,
+      assetsSubGroup: payload.assetsSubGroup,
+      ...(payload.paidBy ? { paidBy: payload.paidBy } : {}),
+      ...(payload.paidFrom ? { paidFrom: payload.paidFrom } : {}),
+      ...calculated,
+    });
+
+    return await populateAssetsQuery(Assets.findById(created._id));
+  } catch (err) {
+    // যদি কোনো কারণে DB সেভ ফেল করে তবে ব্যাংক ব্যালেন্স আগের মতো ফিরিয়ে দেওয়া হবে
+    if (payload.paidFrom && calculated.grandTotalCost > 0) {
+      await BanksDetailServices.recordAssetSellDepositIntoBank({
+        bankId: payload.paidFrom,
+        amount: calculated.grandTotalCost,
+        date: new Date(),
+        note: "Rollback failed asset purchase creation",
+      });
+    }
+    throw err;
+  }
 };
 
 // সব অ্যাসেট ও তাদের বর্তমান depreciation রিপোর্ট/ভিউ রিটার্ন করে
@@ -184,6 +259,14 @@ const getAllAssetsFromDB = async (query: Record<string, unknown> = {}) => {
     filter.assetsSubGroup = query.assetsSubGroup.trim();
   }
 
+  if (typeof query.paidBy === "string" && query.paidBy.trim()) {
+    filter.paidBy = query.paidBy.trim();
+  }
+
+  if (typeof query.paidFrom === "string" && query.paidFrom.trim()) {
+    filter.paidFrom = query.paidFrom.trim();
+  }
+
   if (typeof query.searchTerm === "string" && query.searchTerm.trim()) {
     filter["assets.assetName"] = {
       $regex: query.searchTerm.trim(),
@@ -191,14 +274,11 @@ const getAllAssetsFromDB = async (query: Record<string, unknown> = {}) => {
     };
   }
 
-  const docs = await Assets.find(filter)
-    .populate([
-      { path: "assetsGroup", select: "groupName" },
-      { path: "assetsSubGroup", select: "subGroupName groupId" },
-    ])
-    .sort({ createdAt: -1 });
+  const docs = await populateAssetsQuery(
+    Assets.find(filter).sort({ createdAt: -1 })
+  );
 
-  return docs.map((doc) => {
+  return docs.map((doc: any) => {
     const plain = doc.toObject();
     const recalc = calculateAssetsData(plain.assets || []);
     return {
@@ -225,19 +305,21 @@ const getAssetDepreciationReportFromDB = async (
       groupName,
       assetsSubGroup: record.assetsSubGroup,
       subGroupName,
+      paidBy: record.paidBy,
+      paidFrom: record.paidFrom,
       assetName: item.assetName,
       assetCode: item.assetCode || "",
       purchaseDate: item.purchaseDate,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       totalCost: item.totalCost,
-      depreciationPeriod: item.depreciationPeriod, // "monthly" | "yearly"
-      depreciationMode: item.depreciationMode, // "amount" | "percentage"
-      depreciationValue: item.depreciationValue, // কত টাকা বা কত %
-      depreciationPerPeriod: item.depreciationPerPeriod, // প্রতি মাস বা বছরে কত টাকা
-      elapsedPeriods: item.elapsedPeriods, // কত মাস বা বছর পার হয়েছে
-      depreciatedAmount: item.depreciatedAmount, // এখন পর্যন্ত কত টাকা কাটা হয়েছে
-      remainingDepreciableAmount: item.remainingDepreciableAmount, // ভবিষ্যতে আর কত টাকা কাটবে
+      depreciationPeriod: item.depreciationPeriod,
+      depreciationMode: item.depreciationMode,
+      depreciationValue: item.depreciationValue,
+      depreciationPerPeriod: item.depreciationPerPeriod,
+      elapsedPeriods: item.elapsedPeriods,
+      depreciatedAmount: item.depreciatedAmount,
+      remainingDepreciableAmount: item.remainingDepreciableAmount,
       isFullyDepreciated: item.isFullyDepreciated,
       depreciationSummary: item.depreciationSummary,
       notes: item.notes || "",
@@ -247,17 +329,20 @@ const getAssetDepreciationReportFromDB = async (
   const summary = {
     totalItems: reportItems.length,
     totalQuantity: round2(
-      reportItems.reduce((sum, r) => sum + Number(r.quantity || 0), 0)
+      reportItems.reduce((sum: number, r: any) => sum + Number(r.quantity || 0), 0)
     ),
     grandTotalCost: round2(
-      reportItems.reduce((sum, r) => sum + Number(r.totalCost || 0), 0)
+      reportItems.reduce((sum: number, r: any) => sum + Number(r.totalCost || 0), 0)
     ),
     totalDepreciatedAmount: round2(
-      reportItems.reduce((sum, r) => sum + Number(r.depreciatedAmount || 0), 0)
+      reportItems.reduce(
+        (sum: number, r: any) => sum + Number(r.depreciatedAmount || 0),
+        0
+      )
     ),
     totalRemainingDepreciableAmount: round2(
       reportItems.reduce(
-        (sum, r) => sum + Number(r.remainingDepreciableAmount || 0),
+        (sum: number, r: any) => sum + Number(r.remainingDepreciableAmount || 0),
         0
       )
     ),
@@ -269,12 +354,129 @@ const getAssetDepreciationReportFromDB = async (
   };
 };
 
-const getSingleAssetByIdFromDB = async (id: string) => {
-  const doc = await Assets.findById(id).populate([
-    { path: "assetsGroup", select: "groupName description" },
-    { path: "assetsSubGroup", select: "subGroupName description groupId" },
-  ]);
+// Purchase (Assets collection) ও Sell (AssetsSell collection) ফিল্টার করে একসাথে রিপোর্ট বের করার জন্য
+const getAssetTransactionReportFromDB = async (
+  query: Record<string, unknown> = {}
+) => {
+  const typeFilter = String(query.type || "all").toLowerCase(); // "all" | "purchase" | "sell"
+  const userId = typeof query.userId === "string" ? query.userId.trim() : "";
+  const bankId =
+    typeof query.bankAccountId === "string" ? query.bankAccountId.trim() : "";
+  const groupId =
+    typeof query.assetsGroup === "string" ? query.assetsGroup.trim() : "";
+  const startDate = query.startDate ? new Date(String(query.startDate)) : null;
+  const endDate = query.endDate ? new Date(String(query.endDate)) : null;
+  if (endDate) endDate.setHours(23, 59, 59, 999);
 
+  const records: any[] = [];
+
+  if (typeFilter === "all" || typeFilter === "purchase") {
+    const pFilter: Record<string, unknown> = {};
+    if (userId) pFilter.paidBy = userId;
+    if (bankId) pFilter.paidFrom = bankId;
+    if (groupId) pFilter.assetsGroup = groupId;
+    if (startDate || endDate) {
+      pFilter.createdAt = {};
+      if (startDate) (pFilter.createdAt as any).$gte = startDate;
+      if (endDate) (pFilter.createdAt as any).$lte = endDate;
+    }
+
+    const purchases = await populateAssetsQuery(
+      Assets.find(pFilter).sort({ createdAt: -1 })
+    );
+
+    purchases.forEach((doc: any) => {
+      const p = doc.toObject();
+      records.push({
+        _id: p._id,
+        type: "purchase",
+        direction: "out",
+        date: p.assets?.[0]?.purchaseDate || p.createdAt,
+        assetsGroup: p.assetsGroup,
+        assetsSubGroup: p.assetsSubGroup,
+        user: p.paidBy || null,
+        bankAccount: p.paidFrom || null,
+        items: p.assets || [],
+        quantity: p.totalQuantity || 0,
+        amount: p.grandTotalCost || 0,
+        createdAt: p.createdAt,
+      });
+    });
+  }
+
+  if (
+    (typeFilter === "all" || typeFilter === "sell") &&
+    mongoose.models.AssetsSell
+  ) {
+    const AssetsSellModel = mongoose.models.AssetsSell;
+    const sFilter: Record<string, unknown> = {};
+    if (userId) sFilter.receivedBy = userId;
+    if (bankId) sFilter.depositToBank = bankId;
+    if (groupId) sFilter.assetsGroup = groupId;
+    if (startDate || endDate) {
+      sFilter.sellDate = {};
+      if (startDate) (sFilter.sellDate as any).$gte = startDate;
+      if (endDate) (sFilter.sellDate as any).$lte = endDate;
+    }
+
+    const sales = await AssetsSellModel.find(sFilter)
+      .populate("assetsGroup", "groupName")
+      .populate("assetsSubGroup", "subGroupName")
+      .populate("receivedBy", "name email role")
+      .populate("depositToBank", "bankName accountNo accountName currentBalance")
+      .sort({ sellDate: -1, createdAt: -1 });
+
+    sales.forEach((doc: any) => {
+      const s = doc.toObject();
+      records.push({
+        _id: s._id,
+        invoiceNo: s.invoiceNo || "",
+        type: "sell",
+        direction: "in",
+        date: s.sellDate || s.createdAt,
+        assetsGroup: s.assetsGroup,
+        assetsSubGroup: s.assetsSubGroup,
+        user: s.receivedBy || null,
+        bankAccount: s.depositToBank || null,
+        soldItems: s.soldItems || [],
+        quantity: s.totalSoldQuantity || 0,
+        amount: s.grandTotalSellAmount || 0,
+        profitOrLoss: s.grandProfitOrLoss || 0,
+        customerName: s.customerName || "",
+        customerPhone: s.customerPhone || "",
+        createdAt: s.createdAt,
+      });
+    });
+  }
+
+  records.sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+
+  const totalPurchase = round2(
+    records
+      .filter((r) => r.type === "purchase")
+      .reduce((sum, r) => sum + Number(r.amount || 0), 0)
+  );
+  const totalSell = round2(
+    records
+      .filter((r) => r.type === "sell")
+      .reduce((sum, r) => sum + Number(r.amount || 0), 0)
+  );
+
+  return {
+    summary: {
+      totalRecords: records.length,
+      totalPurchase,
+      totalSell,
+      netBalanceEffect: round2(totalSell - totalPurchase),
+    },
+    records,
+  };
+};
+
+const getSingleAssetByIdFromDB = async (id: string) => {
+  const doc = await populateAssetsQuery(Assets.findById(id));
   if (!doc) return null;
 
   const plain = doc.toObject();
@@ -293,24 +495,86 @@ const updateAssetsIntoDB = async (id: string, payload: Partial<IAssets>) => {
 
   const targetGroupId = payload.assetsGroup || existingDoc.assetsGroup;
   const targetSubGroupId = payload.assetsSubGroup || existingDoc.assetsSubGroup;
+  const targetPaidBy = payload.paidBy || existingDoc.paidBy;
+  const targetPaidFrom = payload.paidFrom || existingDoc.paidFrom;
 
   await validateGroupAndSubGroup(targetGroupId, targetSubGroupId);
+  if (targetPaidBy && targetPaidFrom) {
+    await validateUserAndBankAccount(targetPaidBy, targetPaidFrom);
+  }
 
   const sourceItems = payload.assets ?? existingDoc.assets;
   const calculated = calculateAssetsData(sourceItems);
 
-  const updated = await Assets.findByIdAndUpdate(
-    id,
-    {
-      assetsGroup: targetGroupId,
-      assetsSubGroup: targetSubGroupId,
-      ...calculated,
-    },
-    { new: true, runValidators: true }
-  ).populate([
-    { path: "assetsGroup", select: "groupName" },
-    { path: "assetsSubGroup", select: "subGroupName groupId" },
-  ]);
+  const oldBankId = existingDoc.paidFrom ? String(existingDoc.paidFrom) : null;
+  const newBankId = targetPaidFrom ? String(targetPaidFrom) : null;
+  const oldTotal = Number(existingDoc.grandTotalCost || 0);
+  const newTotal = Number(calculated.grandTotalCost || 0);
+
+  // ব্যাংক ব্যালেন্স অ্যাডজাস্টমেন্ট
+  if (oldBankId && newBankId) {
+    if (oldBankId === newBankId) {
+      const diff = round2(newTotal - oldTotal);
+      if (diff > 0) {
+        await BanksDetailServices.recordAssetPurchaseOutFromBank({
+          bankId: newBankId,
+          amount: diff,
+          date: new Date(),
+          referenceId: existingDoc._id,
+          note: `Asset purchase updated (increased) (Ref: ${existingDoc._id})`,
+        });
+      } else if (diff < 0) {
+        await BanksDetailServices.recordAssetSellDepositIntoBank({
+          bankId: newBankId,
+          amount: Math.abs(diff),
+          date: new Date(),
+          referenceId: existingDoc._id,
+          note: `Asset purchase updated (decreased) (Ref: ${existingDoc._id})`,
+        });
+      }
+    } else {
+      if (newTotal > 0) {
+        await BanksDetailServices.recordAssetPurchaseOutFromBank({
+          bankId: newBankId,
+          amount: newTotal,
+          date: new Date(),
+          referenceId: existingDoc._id,
+          note: `Asset purchase moved to account (Ref: ${existingDoc._id})`,
+        });
+      }
+      if (oldTotal > 0) {
+        await BanksDetailServices.recordAssetSellDepositIntoBank({
+          bankId: oldBankId,
+          amount: oldTotal,
+          date: new Date(),
+          referenceId: existingDoc._id,
+          note: `Asset purchase refunded to old account (Ref: ${existingDoc._id})`,
+        });
+      }
+    }
+  } else if (!oldBankId && newBankId && newTotal > 0) {
+    await BanksDetailServices.recordAssetPurchaseOutFromBank({
+      bankId: newBankId,
+      amount: newTotal,
+      date: new Date(),
+      referenceId: existingDoc._id,
+      note: `Asset purchase payment (Ref: ${existingDoc._id})`,
+    });
+  }
+
+  const updated = await populateAssetsQuery(
+    Assets.findByIdAndUpdate(
+      id,
+      {
+        assetsGroup: targetGroupId,
+        assetsSubGroup: targetSubGroupId,
+        ...(targetPaidBy ? { paidBy: targetPaidBy } : {}),
+        ...(targetPaidFrom ? { paidFrom: targetPaidFrom } : {}),
+        ...calculated,
+      },
+      { new: true, runValidators: true }
+    )
+  );
 
   return updated;
 };
@@ -324,14 +588,28 @@ const addAssetItemIntoDB = async (docId: string, itemPayload: IAssetItem) => {
   const mergedItems = [...existingDoc.assets, itemPayload];
   const calculated = calculateAssetsData(mergedItems);
 
-  const updated = await Assets.findByIdAndUpdate(
-    docId,
-    { ...calculated },
-    { new: true, runValidators: true }
-  ).populate([
-    { path: "assetsGroup", select: "groupName" },
-    { path: "assetsSubGroup", select: "subGroupName groupId" },
-  ]);
+  const diff = round2(
+    Number(calculated.grandTotalCost || 0) -
+      Number(existingDoc.grandTotalCost || 0)
+  );
+
+  if (existingDoc.paidFrom && diff > 0) {
+    await BanksDetailServices.recordAssetPurchaseOutFromBank({
+      bankId: existingDoc.paidFrom,
+      amount: diff,
+      date: new Date(),
+      referenceId: existingDoc._id,
+      note: `Asset item added: ${itemPayload.assetName}`,
+    });
+  }
+
+  const updated = await populateAssetsQuery(
+    Assets.findByIdAndUpdate(
+      docId,
+      { ...calculated },
+      { new: true, runValidators: true }
+    )
+  );
 
   return updated;
 };
@@ -353,28 +631,57 @@ const removeAssetItemFromDB = async (docId: string, itemId: string) => {
   }
 
   const calculated = calculateAssetsData(remainingItems);
+  const diff = round2(
+    Number(existingDoc.grandTotalCost || 0) -
+      Number(calculated.grandTotalCost || 0)
+  );
 
-  const updated = await Assets.findByIdAndUpdate(
-    docId,
-    { ...calculated },
-    { new: true, runValidators: true }
-  ).populate([
-    { path: "assetsGroup", select: "groupName" },
-    { path: "assetsSubGroup", select: "subGroupName groupId" },
-  ]);
+  if (existingDoc.paidFrom && diff > 0) {
+    await BanksDetailServices.recordAssetSellDepositIntoBank({
+      bankId: existingDoc.paidFrom,
+      amount: diff,
+      date: new Date(),
+      referenceId: existingDoc._id,
+      note: `Asset item removed refund (Ref: ${existingDoc._id})`,
+    });
+  }
+
+  const updated = await populateAssetsQuery(
+    Assets.findByIdAndUpdate(
+      docId,
+      { ...calculated },
+      { new: true, runValidators: true }
+    )
+  );
 
   return updated;
 };
 
 const deleteAssetsFromDB = async (id: string) => {
-  const result = await Assets.findByIdAndDelete(id);
-  return result;
+  const existingDoc = await Assets.findById(id);
+  if (!existingDoc) {
+    return null;
+  }
+
+  const refundAmount = Number(existingDoc.grandTotalCost || 0);
+  if (existingDoc.paidFrom && refundAmount > 0) {
+    await BanksDetailServices.recordAssetSellDepositIntoBank({
+      bankId: existingDoc.paidFrom,
+      amount: refundAmount,
+      date: new Date(),
+      referenceId: existingDoc._id,
+      note: `Deleted asset record refund (Ref: ${existingDoc._id})`,
+    });
+  }
+
+  return await Assets.findByIdAndDelete(id);
 };
 
 export const AssetsService = {
   createAssetsIntoDB,
   getAllAssetsFromDB,
   getAssetDepreciationReportFromDB,
+  getAssetTransactionReportFromDB,
   getSingleAssetByIdFromDB,
   updateAssetsIntoDB,
   addAssetItemIntoDB,

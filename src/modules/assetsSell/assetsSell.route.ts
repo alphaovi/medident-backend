@@ -1,26 +1,12 @@
-import express from "express";
-import validateRequest from "../../middlewares/validateRequest.js";
+// assetsSell.route.ts
+import { Router } from "express";
 import { AssetsSellController } from "./assetsSell.controller.js";
-import {
-  createAssetsSellValidationSchema,
-  updateAssetsSellValidationSchema,
-} from "./assetsSell.validation.js";
 
-const router = express.Router();
+const router = Router();
 
-router.get("/available-assets", AssetsSellController.getSelectableAssets);
-router.post(
-  "/",
-  validateRequest(createAssetsSellValidationSchema),
-  AssetsSellController.createAssetsSell
-);
-router.get("/", AssetsSellController.getAllAssetsSell);
-router.get("/:id", AssetsSellController.getSingleAssetsSell);
-router.patch(
-  "/:id",
-  validateRequest(updateAssetsSellValidationSchema),
-  AssetsSellController.updateAssetsSell
-);
-router.delete("/:id", AssetsSellController.deleteAssetsSell);
+router.post("/", AssetsSellController.createAssetSell);
+router.get("/", AssetsSellController.getAllAssetSells);
+router.get("/:id", AssetsSellController.getSingleAssetSell);
+router.delete("/:id", AssetsSellController.deleteAssetSell);
 
 export const AssetsSellRoutes = router;

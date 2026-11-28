@@ -10,9 +10,7 @@ const assetItemZodSchema = z.object({
     .trim()
     .min(1, "Asset name cannot be empty"),
   assetCode: z.string().trim().optional(),
-  purchaseDate: z
-    .union([z.string(), z.date()])
-    .optional(),
+  purchaseDate: z.union([z.string(), z.date()]).optional(),
   quantity: z.coerce
     .number({
       required_error: "Quantity is required",
@@ -55,6 +53,16 @@ const createAssetsValidationSchema = z.object({
       })
       .trim()
       .regex(objectIdRegex, "Invalid Asset Sub-Group ObjectId"),
+    paidBy: z
+      .string()
+      .trim()
+      .regex(objectIdRegex, "Invalid User ObjectId")
+      .optional(),
+    paidFrom: z
+      .string()
+      .trim()
+      .regex(objectIdRegex, "Invalid Bank Account ObjectId")
+      .optional(),
     assets: z
       .array(assetItemZodSchema)
       .min(1, "At least one asset item is required"),
@@ -72,6 +80,16 @@ const updateAssetsValidationSchema = z.object({
       .string()
       .trim()
       .regex(objectIdRegex, "Invalid Asset Sub-Group ObjectId")
+      .optional(),
+    paidBy: z
+      .string()
+      .trim()
+      .regex(objectIdRegex, "Invalid User ObjectId")
+      .optional(),
+    paidFrom: z
+      .string()
+      .trim()
+      .regex(objectIdRegex, "Invalid Bank Account ObjectId")
       .optional(),
     assets: z.array(assetItemZodSchema).min(1).optional(),
   }),

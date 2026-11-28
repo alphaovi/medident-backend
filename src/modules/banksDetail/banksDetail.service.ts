@@ -357,6 +357,92 @@ const refundExpenseIntoBank = async (params: {
   await bankDoc.save();
 };
 
+// Asset Purchase হলে সিলেক্টেড ব্যাংক/ক্যাশ অ্যাকাউন্ট থেকে টাকা মাইনাস (-) হবে
+const recordAssetPurchaseOutFromBank = async (params: {
+  bankId: any;
+  amount: number;
+  date?: Date;
+  referenceId?: any;
+  note?: string;
+}) => {
+  const { bankId, amount, date, referenceId, note } = params;
+  const purchaseAmount = Number(amount);
+
+  if (!mongoose.isValidObjectId(bankId)) {
+    throw createErrorWithStatus("Invalid bank account ID", 400);
+  }
+  if (!purchaseAmount || purchaseAmount <= 0) {
+    throw createErrorWithStatus("Purchase amount must be greater than 0", 400);
+  }
+
+  const bankDoc = await BanksDetailModel.findById(bankId);
+  if (!bankDoc) {
+    throw createErrorWithStatus("Selected bank/cash account not found", 404);
+  }
+
+  const availableBalance = Number(bankDoc.currentBalance) || 0;
+  if (purchaseAmount > availableBalance) {
+    throw createErrorWithStatus(
+      `Insufficient balance in ${bankDoc.bankName} (${bankDoc.accountName}). Available: ৳${availableBalance}, Required: ৳${purchaseAmount}`,
+      400
+    );
+  }
+
+  bankDoc.currentBalance = availableBalance - purchaseAmount;
+  bankDoc.transactions.push({
+    bankAccount: bankDoc._id as any,
+    type: "asset_purchase",
+    direction: "out",
+    amount: purchaseAmount,
+    date: date || new Date(),
+    fromAccount: bankDoc._id as any,
+    toAccount: null,
+    referenceId: referenceId || null,
+    note: note || "Asset purchase",
+  });
+
+  await bankDoc.save();
+  return bankDoc;
+};
+
+// Asset Sell হলে সিলেক্টেড ব্যাংক/ক্যাশ অ্যাকাউন্টে টাকা প্লাস (+) হবে
+const recordAssetSellDepositIntoBank = async (params: {
+  bankId: any;
+  amount: number;
+  date?: Date;
+  referenceId?: any;
+  note?: string;
+}) => {
+  const { bankId, amount, date, referenceId, note } = params;
+  const depositAmount = Number(amount);
+
+  if (!mongoose.isValidObjectId(bankId)) {
+    throw createErrorWithStatus("Invalid bank account ID", 400);
+  }
+  if (!depositAmount || depositAmount <= 0) return;
+
+  const bankDoc = await BanksDetailModel.findById(bankId);
+  if (!bankDoc) {
+    throw createErrorWithStatus("Selected bank/cash account not found", 404);
+  }
+
+  bankDoc.currentBalance = (Number(bankDoc.currentBalance) || 0) + depositAmount;
+  bankDoc.transactions.push({
+    bankAccount: bankDoc._id as any,
+    type: "asset_sell",
+    direction: "in",
+    amount: depositAmount,
+    date: date || new Date(),
+    fromAccount: null,
+    toAccount: bankDoc._id as any,
+    referenceId: referenceId || null,
+    note: note || "Asset sold",
+  });
+
+  await bankDoc.save();
+  return bankDoc;
+};
+
 export const BanksDetailServices = {
   createBankDetailIntoDB,
   getAllBankDetailsFromDB,
@@ -367,4 +453,6 @@ export const BanksDetailServices = {
   recordSalesDepositIntoBank,
   recordExpenseOutFromBank,
   refundExpenseIntoBank,
+  recordAssetPurchaseOutFromBank,
+  recordAssetSellDepositIntoBank,
 };

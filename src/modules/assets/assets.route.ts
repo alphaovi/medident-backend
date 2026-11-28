@@ -6,6 +6,7 @@ const router = Router();
 router.post("/", AssetsController.createAssets);
 router.get("/", AssetsController.getAllAssets);
 router.get("/report/depreciation", AssetsController.getAssetDepreciationReport);
+router.get("/report/transactions", AssetsController.getAssetTransactionReport);
 router.get("/:id", AssetsController.getSingleAsset);
 router.patch("/:id", AssetsController.updateAssets);
 router.post("/:id/items", AssetsController.addAssetItem);

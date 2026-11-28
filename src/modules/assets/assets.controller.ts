@@ -10,7 +10,7 @@ const createAssets = async (req: Request, res: Response) => {
       data: result,
     });
   } catch (error: any) {
-    res.status(400).json({
+    res.status(error?.statusCode || 400).json({
       success: false,
       message: error?.message || "Failed to create assets",
     });
@@ -47,6 +47,24 @@ const getAssetDepreciationReport = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: error?.message || "Failed to retrieve asset depreciation report",
+    });
+  }
+};
+
+const getAssetTransactionReport = async (req: Request, res: Response) => {
+  try {
+    const result = await AssetsService.getAssetTransactionReportFromDB(
+      req.query
+    );
+    res.status(200).json({
+      success: true,
+      message: "Asset purchase & sell report retrieved successfully",
+      data: result,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error?.message || "Failed to retrieve asset transaction report",
     });
   }
 };
@@ -94,7 +112,7 @@ const updateAssets = async (req: Request, res: Response) => {
       data: result,
     });
   } catch (error: any) {
-    res.status(400).json({
+    res.status(error?.statusCode || 400).json({
       success: false,
       message: error?.message || "Failed to update assets",
     });
@@ -119,7 +137,7 @@ const addAssetItem = async (req: Request, res: Response) => {
       data: result,
     });
   } catch (error: any) {
-    res.status(400).json({
+    res.status(error?.statusCode || 400).json({
       success: false,
       message: error?.message || "Failed to add asset item",
     });
@@ -144,7 +162,7 @@ const removeAssetItem = async (req: Request, res: Response) => {
       data: result,
     });
   } catch (error: any) {
-    res.status(400).json({
+    res.status(error?.statusCode || 400).json({
       success: false,
       message: error?.message || "Failed to remove asset item",
     });
@@ -169,7 +187,7 @@ const deleteAssets = async (req: Request, res: Response) => {
       data: result,
     });
   } catch (error: any) {
-    res.status(400).json({
+    res.status(error?.statusCode || 400).json({
       success: false,
       message: error?.message || "Failed to delete assets record",
     });
@@ -180,6 +198,7 @@ export const AssetsController = {
   createAssets,
   getAllAssets,
   getAssetDepreciationReport,
+  getAssetTransactionReport,
   getSingleAsset,
   updateAssets,
   addAssetItem,

@@ -1,114 +1,56 @@
-import { Types } from "mongoose";
-import { Assets } from "../assets/assets.model.js";
-import { AssetsGroup } from "../assetsGroup/assetsGroup.model.js";
-import { AssetsSubGroup } from "../assetsSubGroup/assetsSubGroup.model.js";
+import mongoose from "mongoose";
 import { IAssetSellItem, IAssetsSell } from "./assetsSell.interface.js";
 import { AssetsSell } from "./assetsSell.model.js";
+import { Assets } from "../assets/assets.model.js";
+import { AssetsService } from "../assets/assets.service.js";
+import { UserModel } from "../user/user.model.js";
 import { BanksDetailModel } from "../banksDetail/banksDetail.model.js";
+import { BanksDetailServices } from "../banksDetail/banksDetail.service.js";
 
 const round2 = (num: number): number => Number(num.toFixed(2));
 
-// Group ও SubGroup অনুযায়ী বিক্রয়যোগ্য Asset প্রোডাক্টের বিস্তারিত লিস্ট আনা
-const getSelectableAssetsByGroupAndSubGroupFromDB = async (
-  assetsGroupId: string,
-  assetsSubGroupId: string
-) => {
-  const records = await Assets.find({
-    assetsGroup: assetsGroupId,
-    assetsSubGroup: assetsSubGroupId,
-  }).populate([
+const populateSellQuery = (query: any) =>
+  query.populate([
     { path: "assetsGroup", select: "groupName" },
     { path: "assetsSubGroup", select: "subGroupName groupId" },
+    { path: "receivedBy", select: "name email role phone" },
+    { path: "depositToBank", select: "bankName accountNo accountName currentBalance user" },
   ]);
 
-  const pastSells = await AssetsSell.find({
-    assetsGroup: assetsGroupId,
-    assetsSubGroup: assetsSubGroupId,
-  });
-
-  const soldQtyMap = new Map<string, number>();
-  for (const sellDoc of pastSells) {
-    for (const sItem of sellDoc.soldItems || []) {
-      const key = `${String(sItem.assetsRecordId)}_${String(sItem.assetItemId)}`;
-      soldQtyMap.set(
-        key,
-        (soldQtyMap.get(key) || 0) + Number(sItem.sellQuantity || 0)
-      );
-    }
-  }
-
-  return records.flatMap((record: any) =>
-    (record.assets || []).map((item: any) => {
-      const key = `${String(record._id)}_${String(item._id)}`;
-      const purchasedQuantity = Number(item.quantity || 0);
-      const soldQuantity = soldQtyMap.get(key) || 0;
-      const availableQuantity = Math.max(0, purchasedQuantity - soldQuantity);
-
-      const purchaseUnitPrice = Number(item.unitPrice || 0);
-      const totalPurchaseCost = round2(purchasedQuantity * purchaseUnitPrice);
-      const remainingBookValue = Number(
-        item.remainingDepreciableAmount ??
-          item.netPurchaseCost ??
-          totalPurchaseCost
-      );
-      const currentBookValuePerUnit =
-        purchasedQuantity > 0
-          ? round2(remainingBookValue / purchasedQuantity)
-          : purchaseUnitPrice;
-
-      return {
-        assetsRecordId: record._id,
-        assetItemId: item._id,
-        assetsGroup: record.assetsGroup,
-        assetsSubGroup: record.assetsSubGroup,
-        assetName: item.assetName,
-        assetCode: item.assetCode || "",
-        purchaseDate: item.purchaseDate,
-        purchasedQuantity, // কয়টা কেনা হয়েছিল
-        soldQuantity, // কতটা বিক্রি হয়েছে
-        availableQuantity, // এখন কয়টা বিক্রি করা যাবে
-        purchaseUnitPrice, // কেনার ইউনিট প্রাইস
-        totalPurchaseCost, // মোট কেনা দাম
-        depreciationPeriod: item.depreciationPeriod,
-        depreciationMode: item.depreciationMode,
-        depreciationValue: item.depreciationValue,
-        depreciatedAmount: item.depreciatedAmount || 0,
-        remainingDepreciableAmount: remainingBookValue,
-        currentBookValuePerUnit,
-      };
-    })
-  );
+const generateInvoiceNo = async (): Promise<string> => {
+  const count = await AssetsSell.countDocuments();
+  const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  return `AS-INV-${datePart}-${String(count + 1).padStart(4, "0")}`;
 };
 
-// নতুন Asset Sell তৈরি করা
-const createAssetsSellIntoDB = async (payload: IAssetsSell) => {
-  const group = await AssetsGroup.findById(payload.assetsGroup);
-  if (!group) {
-    throw new Error("Referenced Asset Group does not exist");
+const createAssetSellIntoDB = async (payload: IAssetsSell) => {
+  // 1. Validate User & User's Bank Account (if provided)
+  if (payload.receivedBy && payload.depositToBank) {
+    if (
+      !mongoose.isValidObjectId(String(payload.receivedBy)) ||
+      !mongoose.isValidObjectId(String(payload.depositToBank))
+    ) {
+      throw new Error("Invalid User or Bank Account ID");
+    }
+
+    const userDoc = await UserModel.findById(payload.receivedBy).select("_id");
+    if (!userDoc) throw new Error("Selected user does not exist");
+
+    const bankDoc = await BanksDetailModel.findById(payload.depositToBank);
+    if (!bankDoc) throw new Error("Selected bank/cash account does not exist");
+
+    const bankOwnerId =
+      typeof bankDoc.user === "object" && bankDoc.user !== null && "_id" in bankDoc.user
+        ? String((bankDoc.user as any)._id)
+        : String(bankDoc.user);
+
+    if (bankOwnerId !== String(userDoc._id)) {
+      throw new Error("Selected bank account does not belong to the selected user");
+    }
+  } else if (payload.depositToBank) {
+    const bankDoc = await BanksDetailModel.findById(payload.depositToBank);
+    if (!bankDoc) throw new Error("Selected bank/cash account does not exist");
   }
-
-  const subGroup = await AssetsSubGroup.findById(payload.assetsSubGroup);
-  if (!subGroup) {
-    throw new Error("Referenced Asset Sub-Group does not exist");
-  }
-
-  if (String(subGroup.groupId) !== String(group._id)) {
-    throw new Error(
-      "Selected Asset Sub-Group does not belong to the selected Asset Group"
-    );
-  }
-
-  const availableList = await getSelectableAssetsByGroupAndSubGroupFromDB(
-    String(payload.assetsGroup),
-    String(payload.assetsSubGroup)
-  );
-
-  const availableMap = new Map(
-    availableList.map((entry) => [
-      `${String(entry.assetsRecordId)}_${String(entry.assetItemId)}`,
-      entry,
-    ])
-  );
 
   let totalSoldQuantity = 0;
   let grandTotalSellAmount = 0;
@@ -116,170 +58,178 @@ const createAssetsSellIntoDB = async (payload: IAssetsSell) => {
   let grandBookValueForSold = 0;
   let grandProfitOrLoss = 0;
 
-  const processedItems: IAssetSellItem[] = (payload.soldItems || []).map(
-    (item) => {
-      const key = `${String(item.assetsRecordId)}_${String(item.assetItemId)}`;
-      const matched = availableMap.get(key);
+  const processedSoldItems: IAssetSellItem[] = [];
+  const stockUpdates: Array<{ recordId: string; itemId: string; sellQuantity: number }> = [];
 
-      if (!matched) {
-        throw new Error(
-          `Asset item (${item.assetItemId}) not found under selected Group & SubGroup`
-        );
-      }
-
-      const sellQuantity = Math.max(1, Number(item.sellQuantity || 0));
-      if (sellQuantity > matched.availableQuantity) {
-        throw new Error(
-          `Insufficient available quantity for "${matched.assetName}". Available: ${matched.availableQuantity}, Requested: ${sellQuantity}`
-        );
-      }
-
-      const sellPrice = Math.max(0, Number(item.sellPrice || 0));
-      const totalSellAmount = round2(sellQuantity * sellPrice);
-      const purchaseCostForSold = round2(
-        sellQuantity * matched.purchaseUnitPrice
-      );
-      const bookValueForSold = round2(
-        sellQuantity * matched.currentBookValuePerUnit
-      );
-      const profitOrLoss = round2(totalSellAmount - bookValueForSold);
-
-      totalSoldQuantity += sellQuantity;
-      grandTotalSellAmount += totalSellAmount;
-      grandPurchaseCostForSold += purchaseCostForSold;
-      grandBookValueForSold += bookValueForSold;
-      grandProfitOrLoss += profitOrLoss;
-
-      return {
-        assetsRecordId: new Types.ObjectId(String(item.assetsRecordId)),
-        assetItemId: new Types.ObjectId(String(item.assetItemId)),
-        sellQuantity,
-        sellPrice,
-        purchaseUnitPrice: matched.purchaseUnitPrice,
-        currentBookValuePerUnit: matched.currentBookValuePerUnit,
-        totalSellAmount,
-        purchaseCostForSold,
-        bookValueForSold,
-        profitOrLoss,
-        notes: item.notes || "",
-      };
+  // 2. Calculate each soldItem with current depreciation/book value from Assets collection
+  for (const rawItem of payload.soldItems || []) {
+    const assetRecord = await AssetsService.getSingleAssetByIdFromDB(
+      String(rawItem.assetsRecordId)
+    );
+    if (!assetRecord) {
+      throw new Error(`Assets record not found for ID: ${rawItem.assetsRecordId}`);
     }
-  );
 
-  const sellDate = payload.sellDate ? new Date(payload.sellDate) : new Date();
+    const targetItem = (assetRecord.assets || []).find(
+      (it: any) => String(it._id) === String(rawItem.assetItemId)
+    );
+    if (!targetItem) {
+      throw new Error(`Asset item not found for ID: ${rawItem.assetItemId}`);
+    }
 
-  // চাইলে ব্যাংক অ্যাকাউন্টে বিক্রির টাকা জমা করা যাবে
-  if (payload.depositToBank && grandTotalSellAmount > 0) {
-    await BanksDetailModel.findByIdAndUpdate(payload.depositToBank, {
-      $inc: { currentBalance: grandTotalSellAmount },
-      $push: {
-        transactions: {
-          bankAccount: payload.depositToBank,
-          type: "deposit",
-          direction: "in",
-          amount: grandTotalSellAmount,
-          date: sellDate,
-          note: payload.notes || "Asset Sale Deposit",
-        },
-      },
+    const sellQuantity = Math.max(1, Number(rawItem.sellQuantity || 1));
+    if (sellQuantity > Number(targetItem.quantity || 0)) {
+      throw new Error(
+        `Insufficient stock for "${targetItem.assetName}". Available: ${targetItem.quantity}, Requested: ${sellQuantity}`
+      );
+    }
+
+    const sellPrice = Math.max(0, Number(rawItem.sellPrice || 0));
+    const purchaseUnitPrice = round2(Number(targetItem.unitPrice || 0));
+    const currentBookValuePerUnit = round2(
+      Number(targetItem.quantity) > 0
+        ? Number(targetItem.remainingDepreciableAmount ?? targetItem.totalCost ?? 0) /
+            Number(targetItem.quantity)
+        : 0
+    );
+
+    const totalSellAmount = round2(sellQuantity * sellPrice);
+    const purchaseCostForSold = round2(sellQuantity * purchaseUnitPrice);
+    const bookValueForSold = round2(sellQuantity * currentBookValuePerUnit);
+    const profitOrLoss = round2(totalSellAmount - bookValueForSold);
+
+    totalSoldQuantity += sellQuantity;
+    grandTotalSellAmount += totalSellAmount;
+    grandPurchaseCostForSold += purchaseCostForSold;
+    grandBookValueForSold += bookValueForSold;
+    grandProfitOrLoss += profitOrLoss;
+
+    processedSoldItems.push({
+      assetsRecordId: rawItem.assetsRecordId,
+      assetItemId: rawItem.assetItemId,
+      sellQuantity,
+      sellPrice,
+      purchaseUnitPrice,
+      currentBookValuePerUnit,
+      totalSellAmount,
+      purchaseCostForSold,
+      bookValueForSold,
+      profitOrLoss,
+      notes: rawItem.notes?.trim() || "",
+    });
+
+    stockUpdates.push({
+      recordId: String(rawItem.assetsRecordId),
+      itemId: String(rawItem.assetItemId),
+      sellQuantity,
     });
   }
 
+  const invoiceNo = payload.invoiceNo?.trim() || (await generateInvoiceNo());
+  const sellDate = payload.sellDate ? new Date(payload.sellDate) : new Date();
+
+  // 3. Create record in AssetsSell collection
   const created = await AssetsSell.create({
+    invoiceNo,
     sellDate,
     assetsGroup: payload.assetsGroup,
     assetsSubGroup: payload.assetsSubGroup,
+    receivedBy: payload.receivedBy || null,
     depositToBank: payload.depositToBank || null,
-    customerName: payload.customerName || "",
-    customerPhone: payload.customerPhone || "",
-    soldItems: processedItems,
+    customerName: payload.customerName?.trim() || "",
+    customerPhone: payload.customerPhone?.trim() || "",
+    soldItems: processedSoldItems,
     totalSoldQuantity,
     grandTotalSellAmount: round2(grandTotalSellAmount),
     grandPurchaseCostForSold: round2(grandPurchaseCostForSold),
     grandBookValueForSold: round2(grandBookValueForSold),
     grandProfitOrLoss: round2(grandProfitOrLoss),
-    notes: payload.notes || "",
+    notes: payload.notes?.trim() || "",
   });
 
-  return await created.populate([
-    { path: "assetsGroup", select: "groupName" },
-    { path: "assetsSubGroup", select: "subGroupName groupId" },
-    {
-      path: "depositToBank",
-      select: "bankName accountName accountNo currentBalance",
-    },
-  ]);
+  // 4. Update stock in Assets collection (reduce quantity or remove item/record)
+  for (const upd of stockUpdates) {
+    const doc = await Assets.findById(upd.recordId);
+    if (!doc) continue;
+
+    const updatedAssets = doc.assets
+      .map((it: any) =>
+        String(it._id) === upd.itemId
+          ? { ...it.toObject(), quantity: Number(it.quantity) - upd.sellQuantity }
+          : it.toObject()
+      )
+      .filter((it: any) => Number(it.quantity) > 0);
+
+    if (updatedAssets.length === 0) {
+      await Assets.findByIdAndDelete(upd.recordId);
+    } else {
+      await AssetsService.updateAssetsIntoDB(upd.recordId, {
+        assets: updatedAssets,
+      });
+    }
+  }
+
+  // 5. Add sold amount (+) into selected depositToBank account & record in bank transactions
+  if (payload.depositToBank && grandTotalSellAmount > 0) {
+    await BanksDetailServices.recordAssetSellDepositIntoBank({
+      bankId: payload.depositToBank,
+      amount: round2(grandTotalSellAmount),
+      date: sellDate,
+      referenceId: created._id,
+      note: `Asset Sell (${invoiceNo})${
+        payload.customerName ? ` - Customer: ${payload.customerName}` : ""
+      }`,
+    });
+  }
+
+  return await populateSellQuery(AssetsSell.findById(created._id));
 };
 
-// সব Asset Sell রেকর্ড আনা
-const getAllAssetsSellFromDB = async (query: Record<string, unknown> = {}) => {
+const getAllAssetSellsFromDB = async (query: Record<string, unknown> = {}) => {
   const filter: Record<string, unknown> = {};
 
+  if (typeof query.receivedBy === "string" && query.receivedBy.trim()) {
+    filter.receivedBy = query.receivedBy.trim();
+  }
+  if (typeof query.depositToBank === "string" && query.depositToBank.trim()) {
+    filter.depositToBank = query.depositToBank.trim();
+  }
   if (typeof query.assetsGroup === "string" && query.assetsGroup.trim()) {
     filter.assetsGroup = query.assetsGroup.trim();
   }
-
-  if (
-    typeof query.assetsSubGroup === "string" &&
-    query.assetsSubGroup.trim()
-  ) {
+  if (typeof query.assetsSubGroup === "string" && query.assetsSubGroup.trim()) {
     filter.assetsSubGroup = query.assetsSubGroup.trim();
   }
 
-  return await AssetsSell.find(filter)
-    .populate([
-      { path: "assetsGroup", select: "groupName" },
-      { path: "assetsSubGroup", select: "subGroupName groupId" },
-    ])
-    .sort({ createdAt: -1 });
+  return await populateSellQuery(
+    AssetsSell.find(filter).sort({ sellDate: -1, createdAt: -1 })
+  );
 };
 
-// সিঙ্গেল Asset Sell রেকর্ড আনা
-const getSingleAssetsSellByIdFromDB = async (id: string) => {
-  return await AssetsSell.findById(id).populate([
-    { path: "assetsGroup", select: "groupName" },
-    { path: "assetsSubGroup", select: "subGroupName groupId" },
-  ]);
+const getSingleAssetSellByIdFromDB = async (id: string) => {
+  return await populateSellQuery(AssetsSell.findById(id));
 };
 
-// Asset Sell তথ্য আপডেট করা
-const updateAssetsSellIntoDB = async (
-  id: string,
-  payload: Partial<IAssetsSell>
-) => {
-  const allowedUpdate: Record<string, unknown> = {};
-  if (payload.sellDate !== undefined) {
-    allowedUpdate.sellDate = new Date(payload.sellDate);
-  }
-  if (payload.customerName !== undefined) {
-    allowedUpdate.customerName = payload.customerName;
-  }
-  if (payload.customerPhone !== undefined) {
-    allowedUpdate.customerPhone = payload.customerPhone;
-  }
-  if (payload.notes !== undefined) {
-    allowedUpdate.notes = payload.notes;
+const deleteAssetSellFromDB = async (id: string) => {
+  const existing = await AssetsSell.findById(id);
+  if (!existing) return null;
+
+  if (existing.depositToBank && Number(existing.grandTotalSellAmount) > 0) {
+    await BanksDetailServices.recordAssetPurchaseOutFromBank({
+      bankId: existing.depositToBank,
+      amount: Number(existing.grandTotalSellAmount),
+      date: new Date(),
+      referenceId: existing._id,
+      note: `Deleted asset sell reversal (${existing.invoiceNo || existing._id})`,
+    });
   }
 
-  return await AssetsSell.findByIdAndUpdate(id, allowedUpdate, {
-    new: true,
-    runValidators: true,
-  }).populate([
-    { path: "assetsGroup", select: "groupName" },
-    { path: "assetsSubGroup", select: "subGroupName groupId" },
-  ]);
-};
-
-// Asset Sell রেকর্ড ডিলিট করা
-const deleteAssetsSellFromDB = async (id: string) => {
   return await AssetsSell.findByIdAndDelete(id);
 };
 
 export const AssetsSellService = {
-  getSelectableAssetsByGroupAndSubGroupFromDB,
-  createAssetsSellIntoDB,
-  getAllAssetsSellFromDB,
-  getSingleAssetsSellByIdFromDB,
-  updateAssetsSellIntoDB,
-  deleteAssetsSellFromDB,
+  createAssetSellIntoDB,
+  getAllAssetSellsFromDB,
+  getSingleAssetSellByIdFromDB,
+  deleteAssetSellFromDB,
 };

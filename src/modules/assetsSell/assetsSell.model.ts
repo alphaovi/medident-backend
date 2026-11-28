@@ -61,6 +61,7 @@ const assetsSellSchema = new Schema<IAssetsSellDocument>(
       type: String,
       trim: true,
       unique: true,
+      sparse: true,
     },
     sellDate: {
       type: Date,
@@ -69,12 +70,17 @@ const assetsSellSchema = new Schema<IAssetsSellDocument>(
     assetsGroup: {
       type: Schema.Types.ObjectId,
       ref: "AssetsGroup",
-      required: [true, "Asset group ID is required"],
+      required: [true, "Asset group is required"],
     },
     assetsSubGroup: {
       type: Schema.Types.ObjectId,
       ref: "AssetsSubGroup",
-      required: [true, "Asset sub-group ID is required"],
+      required: [true, "Asset sub-group is required"],
+    },
+    receivedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
     depositToBank: {
       type: Schema.Types.ObjectId,
@@ -95,7 +101,7 @@ const assetsSellSchema = new Schema<IAssetsSellDocument>(
       type: [assetSellItemSchema],
       validate: {
         validator: (val: IAssetSellItem[]) => Array.isArray(val) && val.length > 0,
-        message: "At least one sold item is required",
+        message: "At least one sold item is required in soldItems array",
       },
     },
     totalSoldQuantity: {
@@ -129,14 +135,6 @@ const assetsSellSchema = new Schema<IAssetsSellDocument>(
     versionKey: false,
   }
 );
-
-assetsSellSchema.pre("save", function (next) {
-  if (!this.invoiceNo) {
-    const randomPart = Math.floor(100000 + Math.random() * 900000);
-    this.invoiceNo = `ASL-${Date.now().toString().slice(-5)}-${randomPart}`;
-  }
-  next();
-});
 
 export const AssetsSell = model<IAssetsSellDocument>(
   "AssetsSell",

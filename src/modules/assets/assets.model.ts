@@ -99,6 +99,18 @@ const assetsSchema = new Schema<IAssetsDocument>(
       ref: "AssetsSubGroup",
       required: [true, "Asset sub-group is required"],
     },
+    paidBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: false,
+      index: true,
+    },
+    paidFrom: {
+      type: Schema.Types.ObjectId,
+      ref: "BanksDetail",
+      required: false,
+      index: true,
+    },
     assets: {
       type: [assetItemSchema],
       validate: {

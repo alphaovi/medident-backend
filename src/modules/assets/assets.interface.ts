@@ -32,6 +32,8 @@ export type IAssetItem = {
 export type IAssets = {
   assetsGroup: Types.ObjectId;
   assetsSubGroup: Types.ObjectId;
+  paidBy?: Types.ObjectId;
+  paidFrom?: Types.ObjectId;
   assets: IAssetItem[];
 
   // পুরো ডকুমেন্টের সারসংক্ষেপ

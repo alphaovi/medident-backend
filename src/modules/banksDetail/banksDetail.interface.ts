@@ -4,7 +4,9 @@ export type IBankTransactionType =
   | "deposit"
   | "transfer_in"
   | "transfer_out"
-  | "expense";
+  | "expense"
+  | "asset_purchase"
+  | "asset_sell";
 
 export type IBankTransactionDirection = "in" | "out";
 

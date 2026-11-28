@@ -21,6 +21,7 @@ export type IAssetsSell = {
   sellDate?: Date | string;
   assetsGroup: Types.ObjectId;
   assetsSubGroup: Types.ObjectId;
+  receivedBy?: Types.ObjectId | null;
   depositToBank?: Types.ObjectId | null;
   customerName?: string;
   customerPhone?: string;
