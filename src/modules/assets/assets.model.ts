@@ -31,44 +31,38 @@ const assetItemSchema = new Schema<IAssetItem>(
     totalCost: {
       type: Number,
       default: 0,
-      min: [0, "Total cost cannot be negative"],
     },
     depreciationPeriod: {
       type: String,
       enum: ["monthly", "yearly"],
-      required: [true, "Depreciation period (monthly/yearly) is required"],
       default: "yearly",
     },
     depreciationMode: {
       type: String,
-      enum: ["amount", "percentage"],
-      required: [true, "Depreciation mode (amount/percentage) is required"],
+      enum: ["percentage", "amount"],
       default: "percentage",
     },
     depreciationValue: {
       type: Number,
       required: [true, "Depreciation value is required"],
       min: [0, "Depreciation value cannot be negative"],
+      default: 0,
     },
     elapsedPeriods: {
       type: Number,
       default: 0,
-      min: [0, "Elapsed periods cannot be negative"],
     },
     depreciationPerPeriod: {
       type: Number,
       default: 0,
-      min: [0, "Depreciation per period cannot be negative"],
     },
     depreciatedAmount: {
       type: Number,
       default: 0,
-      min: [0, "Depreciated amount cannot be negative"],
     },
     remainingDepreciableAmount: {
       type: Number,
       default: 0,
-      min: [0, "Remaining depreciable amount cannot be negative"],
     },
     isFullyDepreciated: {
       type: Boolean,
@@ -102,14 +96,12 @@ const assetsSchema = new Schema<IAssetsDocument>(
     paidBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: false,
-      index: true,
+      default: null,
     },
     paidFrom: {
       type: Schema.Types.ObjectId,
       ref: "BanksDetail",
-      required: false,
-      index: true,
+      default: null,
     },
     assets: {
       type: [assetItemSchema],

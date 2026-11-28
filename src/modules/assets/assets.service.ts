@@ -85,17 +85,14 @@ const calculateAssetsData = (items: IAssetItem[]) => {
       item.elapsedPeriods
     );
 
-    // প্রতি মাস বা বছরে কত টাকা কাটবে
     const depreciationPerPeriod =
       depreciationMode === "percentage"
         ? round2((totalCost * depreciationValue) / 100)
         : round2(depreciationValue);
 
-    // এখন পর্যন্ত কত টাকা কাটা হয়েছে
     const rawDepreciated = round2(depreciationPerPeriod * elapsedPeriods);
     const depreciatedAmount = round2(Math.min(totalCost, rawDepreciated));
 
-    // ভবিষ্যতে আর কত টাকা কাটবে
     const remainingDepreciableAmount = round2(
       Math.max(0, totalCost - depreciatedAmount)
     );
@@ -234,7 +231,6 @@ const createAssetsIntoDB = async (payload: IAssets) => {
 
     return await populateAssetsQuery(Assets.findById(created._id));
   } catch (err) {
-    // যদি কোনো কারণে DB সেভ ফেল করে তবে ব্যাংক ব্যালেন্স আগের মতো ফিরিয়ে দেওয়া হবে
     if (payload.paidFrom && calculated.grandTotalCost > 0) {
       await BanksDetailServices.recordAssetSellDepositIntoBank({
         bankId: payload.paidFrom,
@@ -247,7 +243,6 @@ const createAssetsIntoDB = async (payload: IAssets) => {
   }
 };
 
-// সব অ্যাসেট ও তাদের বর্তমান depreciation রিপোর্ট/ভিউ রিটার্ন করে
 const getAllAssetsFromDB = async (query: Record<string, unknown> = {}) => {
   const filter: Record<string, unknown> = {};
 
@@ -269,8 +264,7 @@ const getAllAssetsFromDB = async (query: Record<string, unknown> = {}) => {
 
   if (typeof query.searchTerm === "string" && query.searchTerm.trim()) {
     filter["assets.assetName"] = {
-      $regex: query.searchTerm.trim(),
-      $options: "i",
+      $regex: query.searchTerm.trim(),$options: "i",
     };
   }
 
@@ -288,7 +282,6 @@ const getAllAssetsFromDB = async (query: Record<string, unknown> = {}) => {
   });
 };
 
-// ফ্ল্যাট লিস্ট আকারে প্রতিটি অ্যাসেট আইটেমের কেনার তারিখ, পিরিয়ড, রেট, কাটা টাকা ও বাকি টাকা দেখার জন্য
 const getAssetDepreciationReportFromDB = async (
   query: Record<string, unknown> = {}
 ) => {
@@ -354,11 +347,10 @@ const getAssetDepreciationReportFromDB = async (
   };
 };
 
-// Purchase (Assets collection) ও Sell (AssetsSell collection) ফিল্টার করে একসাথে রিপোর্ট বের করার জন্য
 const getAssetTransactionReportFromDB = async (
   query: Record<string, unknown> = {}
 ) => {
-  const typeFilter = String(query.type || "all").toLowerCase(); // "all" | "purchase" | "sell"
+  const typeFilter = String(query.type || "all").toLowerCase();
   const userId = typeof query.userId === "string" ? query.userId.trim() : "";
   const bankId =
     typeof query.bankAccountId === "string" ? query.bankAccountId.trim() : "";
@@ -511,7 +503,6 @@ const updateAssetsIntoDB = async (id: string, payload: Partial<IAssets>) => {
   const oldTotal = Number(existingDoc.grandTotalCost || 0);
   const newTotal = Number(calculated.grandTotalCost || 0);
 
-  // ব্যাংক ব্যালেন্স অ্যাডজাস্টমেন্ট
   if (oldBankId && newBankId) {
     if (oldBankId === newBankId) {
       const diff = round2(newTotal - oldTotal);

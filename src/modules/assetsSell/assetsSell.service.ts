@@ -24,7 +24,6 @@ const generateInvoiceNo = async (): Promise<string> => {
 };
 
 const createAssetSellIntoDB = async (payload: IAssetsSell) => {
-  // 1. Validate User & User's Bank Account (if provided)
   if (payload.receivedBy && payload.depositToBank) {
     if (
       !mongoose.isValidObjectId(String(payload.receivedBy)) ||
@@ -61,7 +60,6 @@ const createAssetSellIntoDB = async (payload: IAssetsSell) => {
   const processedSoldItems: IAssetSellItem[] = [];
   const stockUpdates: Array<{ recordId: string; itemId: string; sellQuantity: number }> = [];
 
-  // 2. Calculate each soldItem with current depreciation/book value from Assets collection
   for (const rawItem of payload.soldItems || []) {
     const assetRecord = await AssetsService.getSingleAssetByIdFromDB(
       String(rawItem.assetsRecordId)
@@ -128,7 +126,6 @@ const createAssetSellIntoDB = async (payload: IAssetsSell) => {
   const invoiceNo = payload.invoiceNo?.trim() || (await generateInvoiceNo());
   const sellDate = payload.sellDate ? new Date(payload.sellDate) : new Date();
 
-  // 3. Create record in AssetsSell collection
   const created = await AssetsSell.create({
     invoiceNo,
     sellDate,
@@ -147,7 +144,6 @@ const createAssetSellIntoDB = async (payload: IAssetsSell) => {
     notes: payload.notes?.trim() || "",
   });
 
-  // 4. Update stock in Assets collection (reduce quantity or remove item/record)
   for (const upd of stockUpdates) {
     const doc = await Assets.findById(upd.recordId);
     if (!doc) continue;
@@ -169,7 +165,7 @@ const createAssetSellIntoDB = async (payload: IAssetsSell) => {
     }
   }
 
-  // 5. Add sold amount (+) into selected depositToBank account & record in bank transactions
+  // সিলেক্টেড depositToBank অ্যাকাউন্টে বিক্রির টাকা প্লাস (+) হবে
   if (payload.depositToBank && grandTotalSellAmount > 0) {
     await BanksDetailServices.recordAssetSellDepositIntoBank({
       bankId: payload.depositToBank,

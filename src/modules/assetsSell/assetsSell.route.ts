@@ -1,4 +1,3 @@
-// assetsSell.route.ts
 import { Router } from "express";
 import { AssetsSellController } from "./assetsSell.controller.js";
 

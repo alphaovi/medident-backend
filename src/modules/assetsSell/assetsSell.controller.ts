@@ -1,4 +1,3 @@
-// assetsSell.controller.ts
 import { Request, Response } from "express";
 import { AssetsSellService } from "./assetsSell.service.js";
 

@@ -58,7 +58,7 @@ const getAssetTransactionReport = async (req: Request, res: Response) => {
     );
     res.status(200).json({
       success: true,
-      message: "Asset purchase & sell report retrieved successfully",
+      message: "Asset transaction report retrieved successfully",
       data: result,
     });
   } catch (error: any) {
@@ -71,16 +71,13 @@ const getAssetTransactionReport = async (req: Request, res: Response) => {
 
 const getSingleAsset = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const result = await AssetsService.getSingleAssetByIdFromDB(id);
-
+    const result = await AssetsService.getSingleAssetByIdFromDB(req.params.id);
     if (!result) {
       return res.status(404).json({
         success: false,
         message: "Assets record not found",
       });
     }
-
     res.status(200).json({
       success: true,
       message: "Assets record retrieved successfully",
@@ -96,16 +93,16 @@ const getSingleAsset = async (req: Request, res: Response) => {
 
 const updateAssets = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const result = await AssetsService.updateAssetsIntoDB(id, req.body);
-
+    const result = await AssetsService.updateAssetsIntoDB(
+      req.params.id,
+      req.body
+    );
     if (!result) {
       return res.status(404).json({
         success: false,
         message: "Assets record not found",
       });
     }
-
     res.status(200).json({
       success: true,
       message: "Assets updated successfully",
@@ -121,19 +118,19 @@ const updateAssets = async (req: Request, res: Response) => {
 
 const addAssetItem = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const result = await AssetsService.addAssetItemIntoDB(id, req.body);
-
+    const result = await AssetsService.addAssetItemIntoDB(
+      req.params.id,
+      req.body
+    );
     if (!result) {
       return res.status(404).json({
         success: false,
         message: "Assets record not found",
       });
     }
-
     res.status(200).json({
       success: true,
-      message: "Asset item added to array successfully",
+      message: "Asset item added successfully",
       data: result,
     });
   } catch (error: any) {
@@ -146,19 +143,19 @@ const addAssetItem = async (req: Request, res: Response) => {
 
 const removeAssetItem = async (req: Request, res: Response) => {
   try {
-    const { id, itemId } = req.params;
-    const result = await AssetsService.removeAssetItemFromDB(id, itemId);
-
+    const result = await AssetsService.removeAssetItemFromDB(
+      req.params.id,
+      req.params.itemId
+    );
     if (!result) {
       return res.status(404).json({
         success: false,
         message: "Assets record not found",
       });
     }
-
     res.status(200).json({
       success: true,
-      message: "Asset item removed from array successfully",
+      message: "Asset item removed successfully",
       data: result,
     });
   } catch (error: any) {
@@ -171,25 +168,22 @@ const removeAssetItem = async (req: Request, res: Response) => {
 
 const deleteAssets = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const result = await AssetsService.deleteAssetsFromDB(id);
-
+    const result = await AssetsService.deleteAssetsFromDB(req.params.id);
     if (!result) {
       return res.status(404).json({
         success: false,
         message: "Assets record not found",
       });
     }
-
     res.status(200).json({
       success: true,
-      message: "Assets record deleted successfully",
+      message: "Assets deleted successfully",
       data: result,
     });
   } catch (error: any) {
     res.status(error?.statusCode || 400).json({
       success: false,
-      message: error?.message || "Failed to delete assets record",
+      message: error?.message || "Failed to delete assets",
     });
   }
 };
