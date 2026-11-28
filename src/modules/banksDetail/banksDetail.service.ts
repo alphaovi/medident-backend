@@ -24,16 +24,20 @@ const createBankDetailIntoDB = async (
       openingBalance > 0
         ? [
             {
-              type: "opening",
+              type: "deposit",
+              direction: "in",
               amount: openingBalance,
-              balanceAfter: openingBalance,
               date: new Date(),
               note: "Opening balance",
-              createdBy: requester.userId,
             },
           ]
         : [],
   });
+
+  if (openingBalance > 0) {
+    newBank.transactions[0].bankAccount = newBank._id;
+    await newBank.save();
+  }
 
   return await BanksDetailModel.findById(newBank._id).populate(
     "user",
@@ -42,7 +46,6 @@ const createBankDetailIntoDB = async (
 };
 
 const getAllBankDetailsFromDB = async (_requester?: IJwtPayload) => {
-  // ড্রপডাউনে যেকোনো ইউজার সিলেক্ট করলে তার ব্যাংক অ্যাকাউন্টগুলো ফিল্টার করার জন্য সব অ্যাকাউন্ট পাঠানো হচ্ছে
   return await BanksDetailModel.find({})
     .populate("user", "name email role")
     .populate("transactions.bankAccount", "bankName accountNo accountName")
@@ -73,7 +76,7 @@ const deleteBankDetailFromDB = async (id: string) => {
   return await BanksDetailModel.findByIdAndDelete(id);
 };
 
-// Asset Purchase করলে ব্যাংক অ্যাকাউন্ট থেকে টাকা মাইনাস (-) হবে
+// Asset Purchase করলে ব্যাংক অ্যাকাউন্ট থেকে টাকা মাইনাস (-) হবে (direction: "out")
 const recordAssetPurchaseOutFromBank = async (params: {
   bankId: Types.ObjectId | string;
   amount: number;
@@ -100,25 +103,22 @@ const recordAssetPurchaseOutFromBank = async (params: {
   const balanceAfter = round2(currentBalance - amount);
   bank.currentBalance = balanceAfter;
   bank.transactions.push({
-    type: "asset_purchase",
-    amount,
-    balanceAfter,
-    date: params.date ? new Date(params.date) : new Date(),
     bankAccount: bank._id,
+    type: "asset_purchase",
+    direction: "out",
+    amount,
+    date: params.date ? new Date(params.date) : new Date(),
     referenceId: params.referenceId
       ? new mongoose.Types.ObjectId(String(params.referenceId))
-      : undefined,
+      : null,
     note: params.note || "Asset Purchase",
-    createdBy: params.createdBy
-      ? new mongoose.Types.ObjectId(String(params.createdBy))
-      : undefined,
   } as any);
 
   await bank.save();
   return bank;
 };
 
-// Asset Sell করলে ব্যাংক অ্যাকাউন্টে টাকা প্লাস (+) হবে
+// Asset Sell করলে ব্যাংক অ্যাকাউন্টে টাকা প্লাস (+) হবে (direction: "in")
 const recordAssetSellDepositIntoBank = async (params: {
   bankId: Types.ObjectId | string;
   amount: number;
@@ -139,18 +139,15 @@ const recordAssetSellDepositIntoBank = async (params: {
   const balanceAfter = round2(currentBalance + amount);
   bank.currentBalance = balanceAfter;
   bank.transactions.push({
-    type: "asset_sell",
-    amount,
-    balanceAfter,
-    date: params.date ? new Date(params.date) : new Date(),
     bankAccount: bank._id,
+    type: "asset_sell",
+    direction: "in",
+    amount,
+    date: params.date ? new Date(params.date) : new Date(),
     referenceId: params.referenceId
       ? new mongoose.Types.ObjectId(String(params.referenceId))
-      : undefined,
+      : null,
     note: params.note || "Asset Sell Deposit",
-    createdBy: params.createdBy
-      ? new mongoose.Types.ObjectId(String(params.createdBy))
-      : undefined,
   } as any);
 
   await bank.save();

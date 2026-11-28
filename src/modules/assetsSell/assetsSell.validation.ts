@@ -24,7 +24,8 @@ export const createAssetsSellValidationSchema = z.object({
     sellDate: z.union([z.string(), z.date()]).optional(),
     assetsGroup: objectIdSchema,
     assetsSubGroup: objectIdSchema,
-    depositToBank: objectIdSchema.optional(),
+    receivedBy: objectIdSchema.optional().nullable(),
+    depositToBank: objectIdSchema.optional().nullable(),
     customerName: z.string().trim().optional(),
     customerPhone: z.string().trim().optional(),
     soldItems: z
